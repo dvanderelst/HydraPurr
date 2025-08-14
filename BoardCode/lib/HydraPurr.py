@@ -29,40 +29,23 @@ class HydraPurr:
         # Defines the RFID reader
         self.rfid_reader = MyRFID()
 
-    # Methods for the indicator LED
+    # --- indicator LED control ---
+    def indicator_on(self): self.indicator.write(True)
+    def indicator_off(self): self.indicator.write(False)
+    def indicator_toggle(self): self.indicator.toggle()
 
-    def indicator_on(self):
-        self.indicator.write(True)
+    # --- feeder relay control ---
+    def feeder_on(self): self.feeder.write(True)
+    def feeder_off(self): self.feeder.write(False)
+    def feeder_toggle(self): self.feeder.toggle()
 
-    def indicator_off(self):
-        self.indicator.write(False)
-
-    def indicator_toggle(self):
-        current = self.indicator.read()
-        self.indicator.write(not current)
-
-    # Methods for the feeder relay
-
-    def feeder_on(self):
-        self.feeder.write(True)
-
-    def feeder_off(self):
-        self.feeder.write(False)
-
-    def feeder_toggle(self):
-        current = self.feeder.read()
-        self.feeder.write(not current)
-
-    # Methods for the screen
-
-    def screen_write(self, text, x=0, y=0, scale=1, clear=True):
+    # --- screen ---
+    def screen_write(self, text, x=0, y=0, scale=None, clear=True):
         self.screen.write(text, x, y, scale=scale, clear=clear)
 
-    # Read the water level sensor
-
-    def read_water_level(self):
-        value = self.water_level.mean()
-        return value
+    # --- water level ---
+    def read_water_level(self, samples=50, dt=0.001):
+        return self.water_level.mean(num_samples=samples, sample_delay=dt)
 
     # Send data over Bluetooth
     def bluetooth_send(self, message):
@@ -117,7 +100,8 @@ class HydraPurr:
     def log(self, filename, data):
         self.create_log(filename)
         selected_storage = self.stores[filename]
-        result = selected_storage.store(data)
+        result = selected_storage.add(data)
+        return result
 
     def read_log(self, filename, split=True):
         self.create_log(filename)

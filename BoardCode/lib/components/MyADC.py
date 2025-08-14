@@ -28,13 +28,9 @@ class MyADC:
         """Read the raw ADC value (0-65535)."""
         return self.adc.value
 
-    def mean(self, num_samples=1000, sample_delay=0.001):
+    def mean(self, num_samples=100, sample_delay=0.001):
         """
         Read multiple samples from the ADC and return the mean voltage.
-
-        :param num_samples: Number of samples to take (default: 5).
-        :param sample_delay: Time (in seconds) between each sample (default: 0.05).
-        :return: The mean voltage of the samples.
         """
         total_voltage = 0
         for _ in range(num_samples):

@@ -71,12 +71,12 @@ class MyRFID:
         Returns:
         - A dictionary with interpreted fields or None if the package is invalid.
         """
-        if not data_package or len(data_package) < 26:
+        if not data_package or len(data_package) < 29:
             print("Invalid package: Too short or empty.")
-            return None
+            return data_package
         if data_package[0] != 0x02 or data_package[-1] != 0x03:
             print("Invalid package: Missing header or end byte.")
-            return None
+            return data_package
 
         try:
             payload = data_package[1:-1]

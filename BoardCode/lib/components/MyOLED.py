@@ -47,7 +47,8 @@ class MyOLED:
     def framebuffer_char_scaled(self, char, x, y, scale):
         """Draw a scaled character on the framebuffer."""
         # Create a temporary framebuffer for the 8x8 character
-        temp_buffer = bytearray(8 * 8)
+        #temp_buffer = bytearray(8 * 8)
+        temp_buffer = bytearray(8)
         temp_framebuffer = adafruit_framebuf.FrameBuffer(temp_buffer, 8, 8, adafruit_framebuf.MVLSB)
         # Draw the character in its normal 8x8 size
         temp_framebuffer.text(char, 0, 0, 1)
