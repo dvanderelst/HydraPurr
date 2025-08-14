@@ -8,6 +8,11 @@ from components import MyStore
 from components import MyRTC
 from components import MyRFID
 
+from components.MyLogUtils import (
+    set_level, INFO, attach_sink, PrintSink, FileSink,
+    set_time_string_provider, info, warn, error, clear
+)
+
 class HydraPurr:
     def __init__(self):
         # Defines the built-in LED
@@ -28,6 +33,25 @@ class HydraPurr:
         self.rtc = MyRTC()
         # Defines the RFID reader
         self.rfid_reader = MyRFID()
+        # Set up logging for this class
+        set_level(INFO)
+        attach_sink(PrintSink())
+        attach_sink(FileSink("/sd/system.log", "/log.txt", autosync=True))
+        set_time_string_provider(lambda: self.rtc.datetime_str(with_seconds=True))
+        info("HydraPurr initialized")
+
+    # --- clear system log ---
+    def clear_system_log(self):
+        clear()
+        info("Logs cleared")
+        #Todo: integrate the logging with the individual modules
+        # from components.LogUtils import info, warn, error, debug
+        # info("Feeder engaged")
+        # warn("Battery low?")
+        # error("RFID read failed")
+
+    # --- read lick ---
+    def read_lick(self): return self.lick.read()
 
     # --- read lick ---
     def read_lick(self): return self.lick.read()
