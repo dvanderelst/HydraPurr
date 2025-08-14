@@ -1,7 +1,7 @@
 import digitalio
 import board
 
-class myDigital:
+class MyDigital:
     def __init__(self, pin, direction="input", pull=None):
         """
         Initialize the pin as either input or output.

@@ -3,7 +3,7 @@ import busio
 import time
 
 
-class RFIDReader:
+class MyRFID:
     def __init__(self, rx_pin=board.D9, baudrate=9600, timeout=3, poll_interval=0.01):
         """
         Initialize the RFIDReader object.
@@ -118,7 +118,7 @@ class RFIDReader:
 
 # Example usage
 if __name__ == "__main__":
-    rfid_reader = RFIDReader()
+    rfid_reader = MyRFID()
     while True:
         data_package = rfid_reader.read_data_package()
         if data_package:

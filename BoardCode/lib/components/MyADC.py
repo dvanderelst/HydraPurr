@@ -2,7 +2,7 @@ import analogio
 import board
 import time
 
-class myADC:
+class MyADC:
     def __init__(self, channel):
         """Initialize the ADC pin based on the channel number."""
         if channel == 0: 

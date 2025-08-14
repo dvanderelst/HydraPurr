@@ -2,7 +2,7 @@ import board
 import busio
 import time
 
-class myBT:
+class MyBT:
     def __init__(self, baudrate=9600, buffer_size=32, timeout=5):
         """
         Initialize the myBT communication object.

@@ -30,7 +30,7 @@ for test in tests:
     # This test blinks the indicator LED
     if test == 0:
         print("Test 0: Blinking the indicator LED.")
-        indicator_led = myDigital.myDigital(board.D25, 'output')
+        indicator_led = myDigital.MyDigital(board.D25, 'output')
         for x in range(20):
             print(f"Blink {x + 1}")
             indicator_led.write(True)
@@ -42,7 +42,7 @@ for test in tests:
     # This test switches on and off the relay
     if test == 1:
         print("Test 1: Switching on and off the relay.")
-        relay = myDigital.myDigital(board.D6, 'output')
+        relay = myDigital.MyDigital(board.D6, 'output')
         for x in range(3):
             print(f"Relay cycle {x + 1}")
             relay.write(True)
@@ -54,7 +54,7 @@ for test in tests:
     # This tests the screen
     if test == 2:
         print("Test 2: Testing the screen.")
-        oled = myOLED.myOLED()
+        oled = myOLED.MyOLED()
         for x in range(10):
             print(f"Displaying {x} on the screen.")
             oled.write(x, 5, 0, scale=2)
@@ -64,7 +64,7 @@ for test in tests:
     # This tests the water level reading
     if test == 3:
         print("Test 3: Testing the water level reading.")
-        water_level = myADC.myADC(0)
+        water_level = myADC.MyADC(0)
         for x in range(10):
             value = water_level.mean()
             print(f"Reading {x}: {value}")
@@ -74,7 +74,7 @@ for test in tests:
     # This tests the Bluetooth module
     if test == 4:
         print("Test 4: Testing the Bluetooth module.")
-        bt = myBT.myBT()
+        bt = myBT.MyBT()
         for x in range(10):
             msg = f"Sending {x}\n"
             print(f"Sending message: {msg.strip()}")
@@ -85,7 +85,7 @@ for test in tests:
     # This tests the detection of the lick
     if test == 5:
         print("Test 5: Testing lick detection.")
-        lick = myADC.myADC(1)
+        lick = myADC.MyADC(1)
         for x in range(50):
             lick_value = lick.read()
             print(f"Lick {x + 1}: {lick_value}")
@@ -95,7 +95,7 @@ for test in tests:
     # This tests writing to the SD card
     if test == 6:
         print("Test 6: Testing writing to the SD card.")
-        mystore = myStore.myStore()
+        mystore = myStore.MyStore()
         mystore.erase()
         mystore.add(['one', 1, 2, 3])
         mystore.add(['two', 1, 2, 3])
@@ -122,7 +122,7 @@ for test in tests:
     # This tests the RFID module
     if test == 8:
         print("Test 8: Testing the RFID module.")
-        rfid_reader = myRFID.RFIDReader()
+        rfid_reader = myRFID.MyRFID()
         for _ in range(5):  # Limiting iterations for testing
             data_package = rfid_reader.read_data_package()
             if data_package:

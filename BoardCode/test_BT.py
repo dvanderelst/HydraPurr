@@ -1,5 +1,5 @@
 import myBT
-bt = myBT.myBT()
+bt = myBT.MyBT()
 bt.send('hello')
 r = bt.receive()
 print(r)

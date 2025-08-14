@@ -1,5 +1,5 @@
 import board
-from library import neopixel
+from adafruit_other import neopixel
 
 # Preset colors with more comprehensive set
 PRESET_COLORS = {
@@ -18,7 +18,7 @@ PRESET_COLORS = {
     'teal': (0, 128, 128)
 }
 
-class myPixel:
+class MyPixel:
     def __init__(self, pixel_pin=board.NEOPIXEL, num_pixels=1, brightness=0.1, auto_write=True):
         """
         Initialize the NeoPixel controller.
