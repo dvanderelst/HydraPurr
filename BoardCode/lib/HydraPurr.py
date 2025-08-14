@@ -29,6 +29,9 @@ class HydraPurr:
         # Defines the RFID reader
         self.rfid_reader = MyRFID()
 
+    # --- read lick ---
+    def read_lick(self): return self.lick.read()
+
     # --- indicator LED control ---
     def indicator_on(self): self.indicator.write(True)
     def indicator_off(self): self.indicator.write(False)
@@ -85,14 +88,7 @@ class HydraPurr:
             return interpreted_data
         return None
 
-    # Read lick sensor value
-
-    def read_lick(self):
-        value = self.lick.read()
-        return value
-
-    # Methods for logging data
-
+    # --- data logging ---
     def create_log (self, filename):
         exists = filename in self.stores
         if not exists: self.stores[filename] = MyStore(filename)
