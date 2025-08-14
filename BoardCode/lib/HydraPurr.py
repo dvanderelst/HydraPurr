@@ -50,13 +50,12 @@ class HydraPurr:
     def read_water_level(self, samples=50, dt=0.001):
         return self.water_level.mean(num_samples=samples, sample_delay=dt)
 
-    # Send data over Bluetooth
+    # --- send bt data ---
     def bluetooth_send(self, message):
         message = str(message)
         self.bluetooth.send(message)
 
-    # Set and get the current time from the RTC
-
+    # --- RTC time ---
     def set_time(self, yr=None, mt=None, dy=None, hr=None, mn=None, sc=None):
         current = self.rtc.now()
         year = current.tm_year if yr is None else yr
@@ -80,7 +79,7 @@ class HydraPurr:
             "weekday": t.tm_wday,  # 0=Mon..6=Sun
         }
 
-    # Reading the rfid tag
+    # --- read rfid ---
     def read_rfid(self):
         data_package = self.rfid_reader.read_data_package()
         if data_package:
