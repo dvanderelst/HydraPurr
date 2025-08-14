@@ -58,4 +58,75 @@ def main():
                 # Water level reading (ADC channel 0 on HydraPurr)
                 print("Test 3: Water level (10 reads, mean over 50 samples).")
                 for i in range(10):
-                    value = hp
+                    value = hp.read_water_level(samples=50, dt=0.001)  # matches HydraPurr wrapper  :contentReference[oaicite:1]{index=1}
+                    print(f" Reading {i+1}: {value}")
+                    time.sleep(1)
+                print("Test 3 completed.")
+
+            elif test == 4:
+                # Bluetooth send
+                print("Test 4: Bluetooth send (10 messages).")
+                for i in range(10):
+                    msg = f"Sending {i}"
+                    print(f" BT → {msg}")
+                    hp.bluetooth_send(msg)
+                    time.sleep(0.25)
+                print("Test 4 completed.")
+
+            elif test == 5:
+                # Lick detection (ADC channel 1 on HydraPurr)
+                print("Test 5: Lick detection (50 reads).")
+                for i in range(50):
+                    value = hp.read_lick()
+                    print(f" Lick {i+1}: {value}")
+                    time.sleep(0.5)
+                print("Test 5 completed.")
+
+            elif test == 6:
+                # SD logging via MyStore through HydraPurr
+                print("Test 6: SD logging (erase + write a few lines, then read).")
+                fname = "hydra_test.csv"
+                hp.create_log(fname)
+                # Erase file (re-create) by calling MyStore.erase() through the stored instance
+                hp.stores[fname].erase()  # MyStore exposes erase()  :contentReference[oaicite:2]{index=2}
+                hp.log(fname, ['one', 1, 2, 3])
+                hp.log(fname, ['two', 4, 5, 6])
+                hp.log(fname, ['three', 7, 8, 9])
+                print(" Wrote 3 rows. Reading back:")
+                rows = hp.read_log(fname, split=True)
+                print(" ", rows)
+                print("Test 6 completed.")
+
+            elif test == 7:
+                # RTC set/get
+                print("Test 7: Setting RTC (keep date, set minute to 30, seconds to 0), then read.")
+                # Partial set: only update some fields (HydraPurr handles keeping others)  :contentReference[oaicite:3]{index=3}
+                hp.set_time(mn=30, sc=0)
+                print(" Current time (string):", hp.get_time(as_string=True))
+                print(" Current time (dict):", hp.get_time(as_string=False))
+                print("Test 7 completed.")
+
+            elif test == 8:
+                # RFID read (limited attempts)
+                print("Test 8: RFID read (5 attempts).")
+                for i in range(5):
+                    data = hp.read_rfid()
+                    if data is None:
+                        print(" No valid package.")
+                    else:
+                        print(" Interpreted:", data)
+                    time.sleep(2)
+                print("Test 8 completed.")
+
+            else:
+                print(f"Unknown test id: {test}")
+
+        except Exception as e:
+            # Keep the loop going even if a device is missing
+            print(f"[ERROR] Test {test} raised: {e}")
+
+        time.sleep(2)
+        print(f"=== Finished Test {test} ===")
+
+if __name__ == "__main__":
+    main()
