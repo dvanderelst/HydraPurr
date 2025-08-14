@@ -13,12 +13,13 @@ from components.MyLogUtils import (
     set_time_string_provider, info, warn, error, clear
 )
 
+
 class HydraPurr:
     def __init__(self):
         # Defines the built-in LED
         self.indicator = MyDigital(pin=board.D13, direction="output")
         # Defines the relay that controls the feeder
-        self.feeder = MyDigital(pin = board.D6, direction = 'output')
+        self.feeder = MyDigital(pin=board.D6, direction='output')
         # Defines the OLED screen
         self.screen = MyOLED()
         # Defines the water level sensor
@@ -44,27 +45,39 @@ class HydraPurr:
     def clear_system_log(self):
         clear()
         info("Logs cleared")
-        #Todo: integrate the logging with the individual modules
+        # Todo: integrate the logging with the individual modules
         # from components.LogUtils import info, warn, error, debug
         # info("Feeder engaged")
         # warn("Battery low?")
         # error("RFID read failed")
 
     # --- read lick ---
-    def read_lick(self): return self.lick.read()
+    def read_lick(self):
+        return self.lick.read()
 
     # --- read lick ---
-    def read_lick(self): return self.lick.read()
+    def read_lick(self):
+        return self.lick.read()
 
     # --- indicator LED control ---
-    def indicator_on(self): self.indicator.write(True)
-    def indicator_off(self): self.indicator.write(False)
-    def indicator_toggle(self): self.indicator.toggle()
+    def indicator_on(self):
+        self.indicator.write(True)
+
+    def indicator_off(self):
+        self.indicator.write(False)
+
+    def indicator_toggle(self):
+        self.indicator.toggle()
 
     # --- feeder relay control ---
-    def feeder_on(self): self.feeder.write(True)
-    def feeder_off(self): self.feeder.write(False)
-    def feeder_toggle(self): self.feeder.toggle()
+    def feeder_on(self):
+        self.feeder.write(True)
+
+    def feeder_off(self):
+        self.feeder.write(False)
+
+    def feeder_toggle(self):
+        self.feeder.toggle()
 
     # --- screen ---
     def screen_write(self, text, x=0, y=0, scale=None, clear=True):
@@ -112,7 +125,7 @@ class HydraPurr:
         return None
 
     # --- data logging ---
-    def create_log (self, filename):
+    def create_log(self, filename):
         exists = filename in self.stores
         if not exists: self.stores[filename] = MyStore(filename)
 
