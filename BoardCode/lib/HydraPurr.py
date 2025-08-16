@@ -95,27 +95,10 @@ class HydraPurr:
 
     # --- RTC time ---
     def set_time(self, yr=None, mt=None, dy=None, hr=None, mn=None, sc=None):
-        current = self.rtc.now()
-        year = current.tm_year if yr is None else yr
-        month = current.tm_mon if mt is None else mt
-        day = current.tm_mday if dy is None else dy
-        hour = current.tm_hour if hr is None else hr
-        minute = current.tm_min if mn is None else mn
-        second = current.tm_sec if sc is None else sc
-        self.rtc.set_datetime(year, month, day, hour, minute, second)
+        self.rtc.set_time(yr, mt, dy, hr, mn, sc)
 
     def get_time(self, as_string=False):
-        if as_string: return self.rtc.datetime_str()
-        t = self.rtc.now()
-        return {
-            "year": t.tm_year,
-            "month": t.tm_mon,
-            "day": t.tm_mday,
-            "hour": t.tm_hour,
-            "minute": t.tm_min,
-            "second": t.tm_sec,
-            "weekday": t.tm_wday,  # 0=Mon..6=Sun
-        }
+        return self.rtc.get_time(as_string=False, with_seconds=True)
 
     # --- read rfid ---
     def read_rfid(self):
