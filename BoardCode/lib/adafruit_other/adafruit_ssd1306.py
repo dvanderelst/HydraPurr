@@ -23,7 +23,7 @@ try:
     _FRAMEBUF_FORMAT = framebuf.MONO_VLSB
 except ImportError:
     # CircuitPython framebuf import
-    from library import adafruit_framebuf as framebuf
+    from adafruit_other import adafruit_framebuf as framebuf
 
     _FRAMEBUF_FORMAT = framebuf.MVLSB
 

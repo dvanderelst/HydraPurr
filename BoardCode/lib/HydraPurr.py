@@ -17,7 +17,7 @@ from components.MyLogUtils import (
 class HydraPurr:
     def __init__(self):
         # Defines the built-in LED
-        self.indicator = MyDigital(pin=board.D13, direction="output")
+        self.indicator = MyDigital(pin=board.D25, direction="output")
         # Defines the relay that controls the feeder
         self.feeder = MyDigital(pin=board.D6, direction='output')
         # Defines the OLED screen

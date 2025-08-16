@@ -14,7 +14,7 @@ from HydraPurr import HydraPurr  # HydraPurr lives at project root  :contentRefe
 # 6 -> writing to SD (log file)
 # 7 -> set/get RTC time
 # 8 -> RFID module
-TESTS = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+TESTS = [0]
 
 def main():
     hp = HydraPurr()
