@@ -14,7 +14,7 @@ from HydraPurr import HydraPurr  # HydraPurr lives at project root  :contentRefe
 # 6 -> writing to SD (log file)
 # 7 -> set/get RTC time
 # 8 -> RFID module
-TESTS = [0]
+TESTS = [1]
 
 def main():
     hp = HydraPurr()
@@ -36,14 +36,14 @@ def main():
 
             elif test == 1:
                 # Switch the feeder relay on/off
-                print("Test 1: Switching feeder relay (3 cycles, 3s each).")
+                print("Test 1: Switching feeder relay (3 cycles, 0.5s each).")
                 for i in range(3):
                     print(f" Relay cycle {i+1} → ON")
                     hp.feeder_on()
-                    time.sleep(3)
+                    time.sleep(0.5)
                     print(" Relay → OFF")
                     hp.feeder_off()
-                    time.sleep(3)
+                    time.sleep(0.5)
                 print("Test 1 completed.")
 
             elif test == 2:
