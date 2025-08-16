@@ -3,6 +3,8 @@ import board
 import busio
 import adafruit_pcf8523
 
+from components.MySystemLog import debug, info, warn, error
+
 class MyRTC:
     def __init__(self):
         self.i2c = busio.I2C(board.SCL, board.SDA)
@@ -25,8 +27,7 @@ class MyRTC:
         return f"{self.datestr()} {self.timestr(with_seconds)}"
 
     def get_time(self, as_string=False, with_seconds=True):
-        if as_string:
-            return self.dtstr(with_seconds)
+        if as_string: return self.dtstr(with_seconds)
         t = self.now()
         return {
             "year": t.tm_year,
@@ -51,7 +52,9 @@ class MyRTC:
         if 0 <= y <= 99:
             y = 2000 + y
         if not (2000 <= y <= 2099):
-            raise ValueError(f"PCF8523 year must be 2000..2099, got {y}")
+            warn(f"[MyRTC] PCF8523 year must be 2000..2099, got {y}")
+            if y < 2000: y = 2000
+            if y > 2099: y = 2099
         return y
 
     # ---- single partial setter ----
@@ -63,9 +66,7 @@ class MyRTC:
         hour   = cur.tm_hour if hr is None else hr
         minute = cur.tm_min  if mn is None else mn
         second = cur.tm_sec  if sc is None else sc
-        
-        if year < 2000: year = 2000
-        if year > 2099: year = 2099
+
         
         year = self.norm_year(year)
         wday = self.weekday_from_ymd(year, month, day)

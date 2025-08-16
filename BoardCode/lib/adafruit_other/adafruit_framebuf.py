@@ -39,7 +39,7 @@ MHMSB = 3  # Single bit displays like the Sharp Memory
 RGB888 = 4  # Neopixels and Dotstars
 GS2_HMSB = 5  # 2-bit color displays like the HT16K33 8x8 Matrix
 
-font_file = 'lib/adafruit_other/font5x8.bin'
+font_file = '/lib/adafruit_other/font5x8.bin'
 
 class GS2HMSBFormat:
     """GS2HMSBFormat"""

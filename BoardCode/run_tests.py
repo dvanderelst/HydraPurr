@@ -3,6 +3,8 @@
 
 import time
 from HydraPurr import HydraPurr  # HydraPurr lives at project root  :contentReference[oaicite:0]{index=0}
+from components.MySystemLog import setup, set_level, DEBUG, INFO, info
+
 
 # Select which tests to run (same numbering as the old script)
 # 0 -> blinking indicator LED
@@ -15,6 +17,11 @@ from HydraPurr import HydraPurr  # HydraPurr lives at project root  :contentRefe
 # 7 -> set/get RTC time
 # 8 -> RFID module
 TESTS = [7]
+
+
+setup(filename="system.log")
+set_level(DEBUG)
+info("[Run Tests] Start")
 
 def main():
     hp = HydraPurr()
@@ -38,10 +45,8 @@ def main():
                 # Switch the feeder relay on/off
                 print("Test 1: Switching feeder relay (3 cycles, 0.5s each).")
                 for i in range(3):
-                    print(f" Relay cycle {i+1} → ON")
                     hp.feeder_on()
                     time.sleep(0.5)
-                    print(" Relay → OFF")
                     hp.feeder_off()
                     time.sleep(0.5)
                 print("Test 1 completed.")
@@ -58,8 +63,7 @@ def main():
                 # Water level reading (ADC channel 0 on HydraPurr)
                 print("Test 3: Water level (10 reads, mean over 50 samples).")
                 for i in range(10):
-                    value = hp.read_water_level(samples=50, dt=0.001)  # matches HydraPurr wrapper  :contentReference[oaicite:1]{index=1}
-                    print(f" Reading {i+1}: {value}")
+                    hp.read_water_level(samples=50, dt=0.001)  # matches HydraPurr wrapper  :contentReference[oaicite:1]{index=1}
                     time.sleep(1)
                 print("Test 3 completed.")
 
@@ -68,7 +72,6 @@ def main():
                 print("Test 4: Bluetooth send (10 messages).")
                 for i in range(10):
                     msg = f"Sending {i}"
-                    print(f" BT → {msg}")
                     hp.bluetooth_send(msg)
                     time.sleep(0.25)
                 print("Test 4 completed.")
@@ -77,8 +80,7 @@ def main():
                 # Lick detection (ADC channel 1 on HydraPurr)
                 print("Test 5: Lick detection (50 reads).")
                 for i in range(50):
-                    value = hp.read_lick()
-                    print(f" Lick {i+1}: {value}")
+                    hp.read_lick()
                     time.sleep(0.5)
                 print("Test 5 completed.")
 
