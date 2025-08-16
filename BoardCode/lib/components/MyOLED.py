@@ -23,6 +23,10 @@ class MyOLED:
         self.default_scale = default_scale  # Set the default text scaling factor
         self.width = width
         self.height = height
+        
+    def set_rotation(self, value):
+        self.oled.rotate(value)  # Flip the display upside down or not
+        
 
     def clear(self):
         """Clear the display."""

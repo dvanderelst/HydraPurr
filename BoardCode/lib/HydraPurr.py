@@ -22,6 +22,7 @@ class HydraPurr:
         self.feeder = MyDigital(pin=board.D6, direction='output')
         # Defines the OLED screen
         self.screen = MyOLED()
+        self.screen.set_rotation(False)
         # Defines the water level sensor
         self.water_level = MyADC(0)
         # Defines the Bluetooth hardware module
