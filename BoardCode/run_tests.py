@@ -4,6 +4,7 @@
 import time
 from HydraPurr import HydraPurr  # HydraPurr lives at project root  :contentReference[oaicite:0]{index=0}
 from components.MySystemLog import setup, set_level, DEBUG, INFO, info
+from components.MySystemLog import clear_system_log
 
 
 # Select which tests to run (same numbering as the old script)
@@ -16,10 +17,11 @@ from components.MySystemLog import setup, set_level, DEBUG, INFO, info
 # 6 -> writing to SD (log file)
 # 7 -> set/get RTC time
 # 8 -> RFID module
-TESTS = [7]
+TESTS = [6]
 
 
-setup(filename="system.log")
+setup(filename="system.log", autosync=True)
+clear_system_log()
 set_level(DEBUG)
 info("[Run Tests] Start")
 
@@ -87,16 +89,29 @@ def main():
             elif test == 6:
                 # SD logging via MyStore through HydraPurr
                 print("Test 6: SD logging (erase + write a few lines, then read).")
-                fname = "hydra_test.csv"
-                hp.create_log(fname)
-                # Erase file (re-create) by calling MyStore.erase() through the stored instance
-                hp.stores[fname].erase()  # MyStore exposes erase()  :contentReference[oaicite:2]{index=2}
-                hp.log(fname, ['one', 1, 2, 3])
-                hp.log(fname, ['two', 4, 5, 6])
-                hp.log(fname, ['three', 7, 8, 9])
+                fname1 = "hydra_test1.csv"
+                fname2 = "hydra_test2.csv"
+                hp.create_data_log(fname1)
+                hp.create_data_log(fname2)
+               
+                
+                hp.add_data(fname1, ['one', 1, 2, 3])
+                hp.add_data(fname1, ['two', 4, 5, 6])
+                hp.add_data(fname1, ['three', 7, 8, 9])
+                
+                hp.add_data(fname2, ['one', 1, 2, 3])
+                hp.add_data(fname2, ['two', 4, 5, 6])
+                hp.add_data(fname2, ['three', 7, 8, 9])
+                
                 print(" Wrote 3 rows. Reading back:")
-                rows = hp.read_log(fname, split=True)
-                print(" ", rows)
+                rows1 = hp.read_data_log(fname1)
+                rows2 = hp.read_data_log(fname2)
+                print(" ", rows1)
+                print(" ", rows2)
+                
+                print('--')
+                hp.print_directory()
+
                 print("Test 6 completed.")
 
             elif test == 7:

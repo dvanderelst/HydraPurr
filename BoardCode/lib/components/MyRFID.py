@@ -1,10 +1,11 @@
 import board
 import busio
 import time
+from components import MyDigital
 
 
 class MyRFID:
-    def __init__(self, rx_pin=board.D9, baudrate=9600, timeout=3, poll_interval=0.01):
+    def __init__(self):
         """
         Initialize the RFIDReader object.
 
@@ -14,9 +15,19 @@ class MyRFID:
         - timeout: Timeout for reading data.
         - poll_interval: Time interval (in seconds) between polling attempts.
         """
-        self.rfid_uart = busio.UART(rx=rx_pin, tx=None, baudrate=baudrate, timeout=timeout)
-        self.poll_interval = poll_interval
-        self.timeout = timeout
+        self.rx_pin=board.D9
+        self.rst= MyDigital(board.D11, direction="output")
+        self.baudrate = 9600
+        self.timeout = 3
+        self.poll_interval = 0.01
+        self.rfid_uart = busio.UART(rx=self.rx_pin, tx=None, baudrate=self.baudrate, timeout=self.timeout)
+        
+    
+    def reset(self):
+        self.rst.write(True)
+        time.sleep(10/1000)
+        self.rst.write(False)
+        print(self.rst.pin.value)
 
     def read_data_package(self):
         """
@@ -119,11 +130,7 @@ class MyRFID:
 # Example usage
 if __name__ == "__main__":
     rfid_reader = MyRFID()
-    while True:
-        data_package = rfid_reader.read_data_package()
-        if data_package:
-            print(f"Received Data Package: {data_package}")
-            interpreted_data = rfid_reader.interpret_data_package(data_package)
-            print(interpreted_data)
-        else:
-            print("Failed to receive a valid data package.")
+    rfid_reader.reset()
+    time.sleep(1)
+    x = rfid_reader.read_data_package()
+        

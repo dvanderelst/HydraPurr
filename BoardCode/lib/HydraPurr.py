@@ -10,7 +10,7 @@ from components import MyRFID
 
 from components.MySystemLog import debug, info, warn, error
 from components.MySystemLog import clear_system_log
-
+from components.MyStore import print_directory
 
 class HydraPurr:
     def __init__(self):
@@ -107,16 +107,31 @@ class HydraPurr:
         return None
 
     # --- data logging ---
-    def create_data_log(self, filename):
+    def create_data_log(self, filename): #alias for ease
+        return self.select_data_log(filename)
+    
+    def select_data_log(self, filename):
         exists = filename in self.stores
         if not exists: self.stores[filename] = MyStore(filename)
+        selected_storage = self.stores[filename]
+        return selected_storage
 
     def add_data(self, filename, data):
-        self.create_log(filename)
-        selected_storage = self.stores[filename]
+        selected_storage = self.select_data_log(filename)
         result = selected_storage.add(data)
         return result
 
-    def read_data_log(self, filename, split=True):
-        self.create_log(filename)
-        return self.stores[filename].read(split=split)
+    def read_data_log(self, filename):
+        selected_storage = self.select_data_log(filename)
+        return selected_storage.read()
+    
+    def empty_data_log(self, filename):
+        selected_storage = self.select_data_log(filename)
+        selected_storage.empty()
+        return selected_storage
+    
+    def print_directory(self):
+        print_directory('/sd')
+        
+        
+        
