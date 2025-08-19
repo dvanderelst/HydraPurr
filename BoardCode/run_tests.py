@@ -4,7 +4,7 @@
 import time
 from HydraPurr import HydraPurr  # HydraPurr lives at project root  :contentReference[oaicite:0]{index=0}
 from components.MySystemLog import setup, set_level, DEBUG, INFO, info
-from components.MySystemLog import clear_system_log
+from components.MySystemLog import clear_system_log, tail_to_console
 
 
 # Select which tests to run (same numbering as the old script)
@@ -35,7 +35,7 @@ def main():
         try:
             if test == 0:
                 # Blink the indicator LED
-                print("Test 0: Blinking the indicator LED (20 blinks).")
+                info("Test 0: Blinking the indicator LED (20 blinks).")
                 for i in range(20):
                     hp.indicator_on()
                     time.sleep(0.1)
@@ -45,7 +45,7 @@ def main():
 
             elif test == 1:
                 # Switch the feeder relay on/off
-                print("Test 1: Switching feeder relay (3 cycles, 0.5s each).")
+                info("Test 1: Switching feeder relay (3 cycles, 0.5s each).")
                 for i in range(3):
                     hp.feeder_on()
                     time.sleep(0.5)
@@ -55,7 +55,7 @@ def main():
 
             elif test == 2:
                 # Screen test
-                print("Test 2: Writing numbers 0..9 to OLED.")
+                info("Test 2: Writing numbers 0..9 to OLED.")
                 for x in range(10):
                     hp.screen_write(str(x), x=5, y=0, scale=2, clear=True)
                     time.sleep(1)
@@ -63,7 +63,7 @@ def main():
 
             elif test == 3:
                 # Water level reading (ADC channel 0 on HydraPurr)
-                print("Test 3: Water level (10 reads, mean over 50 samples).")
+                info("Test 3: Water level (10 reads, mean over 50 samples).")
                 for i in range(10):
                     hp.read_water_level(samples=50, dt=0.001)  # matches HydraPurr wrapper  :contentReference[oaicite:1]{index=1}
                     time.sleep(1)
@@ -71,7 +71,7 @@ def main():
 
             elif test == 4:
                 # Bluetooth send
-                print("Test 4: Bluetooth send (10 messages).")
+                info("Test 4: Bluetooth send (10 messages).")
                 for i in range(10):
                     msg = f"Sending {i}"
                     hp.bluetooth_send(msg)
@@ -80,7 +80,7 @@ def main():
 
             elif test == 5:
                 # Lick detection (ADC channel 1 on HydraPurr)
-                print("Test 5: Lick detection (50 reads).")
+                info("Test 5: Lick detection (50 reads).")
                 for i in range(50):
                     hp.read_lick()
                     time.sleep(0.5)
@@ -88,7 +88,7 @@ def main():
 
             elif test == 6:
                 # SD logging via MyStore through HydraPurr
-                print("Test 6: SD logging (erase + write a few lines, then read).")
+                info("Test 6: SD logging (erase + write a few lines, then read).")
                 fname1 = "hydra_test1.csv"
                 fname2 = "hydra_test2.csv"
                 hp.create_data_log(fname1)
@@ -103,7 +103,7 @@ def main():
                 hp.add_data(fname2, ['two', 4, 5, 6])
                 hp.add_data(fname2, ['three', 7, 8, 9])
                 
-                print(" Wrote 3 rows. Reading back:")
+                info("Wrote 3 rows. Reading back:")
                 rows1 = hp.read_data_log(fname1)
                 rows2 = hp.read_data_log(fname2)
                 print(" ", rows1)
@@ -112,20 +112,20 @@ def main():
                 print('--')
                 hp.print_directory()
 
-                print("Test 6 completed.")
+                info("Test 6 completed.")
 
             elif test == 7:
                 # RTC set/get
-                print("Test 7: Setting RTC (keep date, set minute to 30, seconds to 0), then read.")
+                info("Test 7: Setting RTC (keep date, set minute to 30, seconds to 0), then read.")
                 # Partial set: only update some fields (HydraPurr handles keeping others)  :contentReference[oaicite:3]{index=3}
                 hp.set_time(mn=30, sc=0)
-                print(" Current time (string):", hp.get_time(as_string=True))
-                print(" Current time (dict):", hp.get_time(as_string=False))
-                print("Test 7 completed.")
+                info(" Current time (string):", hp.get_time(as_string=True))
+                info(" Current time (dict):", hp.get_time(as_string=False))
+                info("Test 7 completed.")
 
             elif test == 8:
                 # RFID read (limited attempts)
-                print("Test 8: RFID read (5 attempts).")
+                info("Test 8: RFID read (5 attempts).")
                 for i in range(5):
                     data = hp.read_rfid()
                     if data is None:
@@ -133,17 +133,18 @@ def main():
                     else:
                         print(" Interpreted:", data)
                     time.sleep(2)
-                print("Test 8 completed.")
+                info("Test 8 completed.")
 
             else:
-                print(f"Unknown test id: {test}")
+                info(f"Unknown test id: {test}")
 
         except Exception as e:
             # Keep the loop going even if a device is missing
-            print(f"[ERROR] Test {test} raised: {e}")
+            info(f"[ERROR] Test {test} raised: {e}")
 
         time.sleep(2)
-        print(f"=== Finished Test {test} ===")
+        info(f"=== Finished Test {test} ===")
 
 if __name__ == "__main__":
     main()
+    tail_to_console()
