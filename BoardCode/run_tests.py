@@ -17,7 +17,7 @@ from components.MySystemLog import clear_system_log, tail_to_console
 # 6 -> writing to SD (log file)
 # 7 -> set/get RTC time
 # 8 -> RFID module
-TESTS = [6]
+TESTS = [5]
 
 
 setup(filename="system.log", autosync=True)

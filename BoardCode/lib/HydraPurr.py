@@ -27,6 +27,7 @@ class HydraPurr:
         self.bluetooth = MyBT()
         # Defines the lick sensor
         self.lick = MyADC(1)
+        self.lick_threshold = 2.0
         # Storing the storage files
         self.stores = {}
         # Defines the RTC for timekeeping
@@ -37,14 +38,16 @@ class HydraPurr:
         debug("[HydraPurr] HydraPurr initialized")
 
     # --- clear system log ---
-    def clear_system_log(self):
+    def clear_system_log(self): # alias for ease
         clear_system_log()
         debug("[HydraPurr] System Log cleared")
 
     # --- read lick ---
-    def read_lick(self):
+    def read_lick(self, binary=True):
         lick_value = self.lick.read()
-        debug(f'[HydraPurr] Lick value: {lick_value}')
+        lick_threshold = self.lick_threshold
+        if binary: lick_value = 1 if lick_value < lick_threshold else 0
+        debug(f'[HydraPurr] Lick value: {lick_value}, binary: {binary}')
         return lick_value
 
     # --- indicator LED control ---
@@ -130,7 +133,7 @@ class HydraPurr:
         selected_storage.empty()
         return selected_storage
     
-    def print_directory(self):
+    def print_directory(self): # alias for ease
         print_directory('/sd')
         
         
