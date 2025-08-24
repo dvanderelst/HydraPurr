@@ -1,6 +1,6 @@
 *.idea*
 *__pycache__*
-old_stuff/
+Archive/
 
 BoardCode/.sync_trash/
 
