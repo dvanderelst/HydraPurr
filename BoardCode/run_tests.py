@@ -17,7 +17,7 @@ from components.MySystemLog import clear_system_log, tail_to_console
 # 6 -> writing to SD (log file)
 # 7 -> set/get RTC time
 # 8 -> RFID module
-TESTS = [5]
+TESTS = [6]
 
 
 setup(filename="system.log", autosync=True)
@@ -93,8 +93,10 @@ def main():
                 fname2 = "hydra_test2.csv"
                 hp.create_data_log(fname1)
                 hp.create_data_log(fname2)
-               
                 
+                hp.empty_data_log(fname1)
+                hp.empty_data_log(fname2)
+                   
                 hp.add_data(fname1, ['one', 1, 2, 3])
                 hp.add_data(fname1, ['two', 4, 5, 6])
                 hp.add_data(fname1, ['three', 7, 8, 9])
@@ -103,15 +105,13 @@ def main():
                 hp.add_data(fname2, ['two', 4, 5, 6])
                 hp.add_data(fname2, ['three', 7, 8, 9])
                 
-                info("Wrote 3 rows. Reading back:")
                 rows1 = hp.read_data_log(fname1)
                 rows2 = hp.read_data_log(fname2)
-                print(" ", rows1)
-                print(" ", rows2)
-                
-                print('--')
-                hp.print_directory()
-
+                info("Wrote 3 rows. Reading back test 1:")
+                for r in rows1: print(r)
+                info("Wrote 3 rows. Reading back test 2:")
+                for r in rows2: print(r)
+            
                 info("Test 6 completed.")
 
             elif test == 7:

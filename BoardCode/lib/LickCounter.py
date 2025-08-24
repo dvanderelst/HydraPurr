@@ -1,9 +1,10 @@
-# LickCounterTime.py
 import time
+from components.MyStore import MyStore
+
 
 class LickCounter:
-    def __init__(self):
-        # Initialize thresholds and counters
+    def __init__(self, clear_log=False, fname="licks.csv"):
+        # thresholds and state
         self.min_lick_ms = 50
         self.max_lick_ms = 150
         self.min_licks_per_bout = 3
@@ -16,23 +17,29 @@ class LickCounter:
         self.candidate_since = None
         self.state_since = time.monotonic() * 1000.0
         self.last_lick_end_ms = None
-
-    def now_ms(self): 
-        # Return current time in ms
-        return time.monotonic() * 1000.0
+        # logging: ISO timestamps with milliseconds, header auto if file is new/empty
+        header = ["state","licks","bouts"]
+        self.store = MyStore(fname, fmt='iso', with_ms=True, auto_header=header, time_label="time")
+        if clear_log:
+            self.store.empty()
+            self.store.header(header, label="time")
+        self.last_logged = (None, None, None)
+    
+    def read(self):
+        lines = self.store.read()
+        return lines
 
     def accept_state(self, s, t_ms):
-        # Accept a state transition and update lick/bout counters
+        # accept state transition, update lick/bout counters
         prev, dur_ms = self.state, (t_ms - self.state_since)
         if prev == 1 and s == 0 and self.min_lick_ms <= dur_ms <= self.max_lick_ms: self.lick_count += 1; self.last_lick_end_ms = t_ms
         elif prev == 1 and s == 0: self.last_lick_end_ms = t_ms
-        if self.last_lick_end_ms is not None and prev == 0 and self.lick_count >= self.min_licks_per_bout and (t_ms - self.last_lick_end_ms) >= self.max_bout_gap_ms:
-            self.bout_count += 1; self.lick_count = 0; self.last_lick_end_ms = None
+        if self.last_lick_end_ms is not None and prev == 0 and self.lick_count >= self.min_licks_per_bout and (t_ms - self.last_lick_end_ms) >= self.max_bout_gap_ms: self.bout_count += 1; self.lick_count = 0; self.last_lick_end_ms = None
         self.state = s; self.state_since = t_ms
 
     def process_sample(self, sample, t_ms=None):
-        # Process one binary sample (0/1) at time t_ms
-        if t_ms is None: t_ms = self.now_ms()
+        # process one binary sample (0/1) and log on meaningful change
+        if t_ms is None: t_ms = time.monotonic() * 1000.0
         s = 1 if sample == 1 else 0
         if self.debounce_ms > 0:
             if s != self.candidate_state: self.candidate_state = s; self.candidate_since = t_ms; return
@@ -42,14 +49,29 @@ class LickCounter:
                 self.candidate_since = None
         else:
             if s != self.state: self.accept_state(s, t_ms)
-        if self.state == 0 and self.last_lick_end_ms is not None and self.lick_count >= self.min_licks_per_bout and (t_ms - self.last_lick_end_ms) >= self.max_bout_gap_ms:
-            self.bout_count += 1; self.lick_count = 0; self.last_lick_end_ms = None
+        if self.state == 0 and self.last_lick_end_ms is not None and self.lick_count >= self.min_licks_per_bout and (t_ms - self.last_lick_end_ms) >= self.max_bout_gap_ms: self.bout_count += 1; self.lick_count = 0; self.last_lick_end_ms = None
 
-    def get_bout_count(self):
-        # Return current bout count
+        current = (s, self.lick_count, self.bout_count)
+        if current != self.last_logged:
+            self.store.add([s, self.lick_count, self.bout_count])   # timestamp auto-prepended by MyStore
+            self.last_logged = current
+
+    def get_bout_count(self): 
+        # return current bout count
         return self.bout_count
 
     def reset_counters(self):
-        # Reset lick and bout counters
+        # reset lick and bout counters
         self.lick_count = 0; self.bout_count = 0; self.last_lick_end_ms = None
 
+    # def set_params(self, min_lick_ms=None, max_lick_ms=None, min_licks_per_bout=None, max_bout_gap_ms=None, debounce_ms=None):
+    #     # optional: update thresholds at runtime
+    #     if min_lick_ms is not None: self.min_lick_ms = int(min_lick_ms)
+    #     if max_lick_ms is not None: self.max_lick_ms = int(max_lick_ms)
+    #     if min_licks_per_bout is not None: self.min_licks_per_bout = int(min_licks_per_bout)
+    #     if max_bout_gap_ms is not None: self.max_bout_gap_ms = int(max_bout_gap_ms)
+    #     if debounce_ms is not None: self.debounce_ms = int(debounce_ms)
+    #
+
+    
+        

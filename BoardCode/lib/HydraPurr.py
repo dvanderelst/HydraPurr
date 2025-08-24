@@ -38,7 +38,8 @@ class HydraPurr:
         debug("[HydraPurr] HydraPurr initialized")
 
     # --- clear system log ---
-    def clear_system_log(self): # alias for ease
+    @staticmethod
+    def clear_system_log(): # alias for ease
         clear_system_log()
         debug("[HydraPurr] System Log cleared")
 
@@ -132,8 +133,9 @@ class HydraPurr:
         selected_storage = self.select_data_log(filename)
         selected_storage.empty()
         return selected_storage
-    
-    def print_directory(self): # alias for ease
+
+    @staticmethod
+    def print_directory(): # alias for ease
         print_directory('/sd')
         
         
