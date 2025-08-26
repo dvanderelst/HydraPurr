@@ -1,136 +1,267 @@
+import time
 import board
 import busio
-import time
-from components import MyDigital
+
+try:
+    from components import MyDigital
+except Exception:
+    MyDigital = None
+
+
+# --- simple, robust parser ---
+def parser_hex_len26(body):
+    """
+    Parse a 26-character ASCII-hex payload (already after checksum/invert).
+    Emits hex, big-endian int, little-endian int, and a stable tag_key.
+    Uses only string/ints for maximum CircuitPython compatibility.
+    """
+    txt = body.decode("ascii").strip()
+    up = txt.upper()
+    if len(up) != 26:
+        return None
+    for c in up:
+        if c not in "0123456789ABCDEF":
+            return None
+
+    # Big-endian integer (as written)
+    try:
+        id_int_be = int(up, 16)
+    except Exception:
+        id_int_be = None
+
+    # Little-endian integer (reverse by byte pairs)
+    pairs = [up[i:i+2] for i in range(0, len(up), 2)]
+    rev_hex = "".join(reversed(pairs))
+    try:
+        id_int_le = int(rev_hex, 16)
+    except Exception:
+        id_int_le = None
+
+    return {
+        "id_hex": up,
+        "id_int_be": id_int_be,
+        "id_int_le": id_int_le,
+        "tag_key": up,
+    }
 
 
 class MyRFID:
+    """Cooperative STX/ETX RFID reader with small, focused helpers."""
+
     def __init__(self):
-        """
-        Initialize the RFIDReader object.
+        # pins (fixed defaults)
+        self.rx_pin = board.D9
+        self.rst_pin = board.D11
 
-        Parameters:
-        - rx_pin: Pin for UART RX.
-        - baudrate: Baud rate for the UART communication.
-        - timeout: Timeout for reading data.
-        - poll_interval: Time interval (in seconds) between polling attempts.
-        """
-        self.rx_pin=board.D9
-        self.rst= MyDigital(board.D11, direction="output")
-        self.baudrate = 9600
-        self.timeout = 3
-        self.poll_interval = 0.01
-        self.rfid_uart = busio.UART(rx=self.rx_pin, tx=None, baudrate=self.baudrate, timeout=self.timeout)
-        
-    
+        # hardware objects
+        self.uart = busio.UART(rx=self.rx_pin, tx=None, baudrate=9600, timeout=0)
+        self.rst = MyDigital(self.rst_pin, direction="output") if (MyDigital and self.rst_pin) else None
+        if self.rst:
+            # Transistor: gate HIGH pulls module RST to GND (active-high reset)
+            # Idle LOW so the module runs
+            self.rst.write(False)
+
+        # defaults
+        self.buf = bytearray()
+        self.max_len = 64
+        self.repeat_ms = 500
+        self.verbose = False
+        self.parser = None  # attach e.g. parser_hex_len26
+        self.invert_required = True
+        self.stx, self.etx = 0x02, 0x03
+        self.last_tag = None
+        self.last_ms = 0
+        # Reset timing (active-high via transistor)
+        self.reset_pulse_ms = 50
+        self.reset_settle_ms = 80
+
+    # --- public ---
     def reset(self):
+        if not self.rst:
+            return
+        if self.verbose:
+            print("reset")
+        # Assert reset via transistor (gate HIGH pulls module RST to GND)
         self.rst.write(True)
-        time.sleep(10/1000)
+        time.sleep(self.reset_pulse_ms / 1000.0)
+        # Release reset (idle LOW on the transistor gate)
         self.rst.write(False)
-        print(self.rst.pin.value)
-
-    def read_data_package(self):
-        """
-        Reads a data package from the RFID module.
-        
-        Returns:
-        - A bytes object containing the data package or None if reading fails.
-        """
+        # Flush UART and parser buffer after reset
         try:
-            print("Waiting for a data package...")
-            start_time = time.monotonic()  # Start the timer
-            
-            # Wait for the start byte (\x02)
-            while True:
-                if self.rfid_uart.in_waiting:
-                    byte = self.rfid_uart.read(1)
-                    if byte == b'\x02':  # Found the start byte
-                        break
-                elif time.monotonic() - start_time > self.timeout:
-                    print("Timeout: No data received.")
-                    return None
-                time.sleep(self.poll_interval)
+            n = getattr(self.uart, "in_waiting", 0)
+        except AttributeError:
+            n = 0
+        if n:
+            _ = self.uart.read(n)
+        self.buf = bytearray()
+        # Short settle so the module is ready to speak again
+        time.sleep(self.reset_settle_ms / 1000.0)
 
-            # Start building the package
-            package = byte
-            start_time = time.monotonic()
-
-            while True:
-                if self.rfid_uart.in_waiting:
-                    byte = self.rfid_uart.read(1)
-                    package += byte
-                    if byte == b'\x03':  # Found the end byte
-                        break
-                elif time.monotonic() - start_time > self.timeout:
-                    print("Timeout: Incomplete data package.")
-                    return None
-                time.sleep(self.poll_interval)
-
-            return package
-        except Exception as e:
-            print(f"Error reading data package: {e}")
+    def poll(self):
+        """Try to read one RFID frame and return it as dict, or None if not ready.
+        Steps:
+          1. Read any available UART bytes into buffer.
+          2. Look for STX (start marker) in buffer.
+          3. If buffer length since STX exceeds max_len → discard and resync.
+          4. Look for ETX (end marker) within allowed window.
+          5. If no ETX yet → return None (incomplete frame).
+          6. Extract frame bytes between STX and ETX.
+          7. Validate frame (checksum, invert).
+          8. Parse body into dict (via custom parser or default ASCII fallback).
+          9. Attach metadata (raw hex, tag_key).
+         10. Suppress duplicates within repeat_ms window.
+         11. Reset to re‑arm reader, then return packet.
+        """
+        self.read_buf()
+        i = self.find_stx()
+        if i < 0:
             return None
+        if self.overrun_since(i):
+            self.discard_through(i)
+            return None
+        j = self.find_etx_within(i)
+        if j < 0:
+            return None
+        frame = self.extract_frame(i, j)
+        body = self.validate_frame(frame)
+        if body is None:
+            return None
+        pkt = self.parse_body(body)
+        if pkt is None:
+            return None
+        self.attach_meta(pkt, body)
+        if not self.dedup(pkt):
+            return None
+        # Re‑arm the reader for next read
+        self.reset()
+        return pkt
 
-    @staticmethod
-    def interpret_data_package(data_package):
-        """
-        Interprets a data package from the RFID module.
-
-        Parameters:
-        - data_package: A bytes object containing the data package.
-
-        Returns:
-        - A dictionary with interpreted fields or None if the package is invalid.
-        """
-        if not data_package or len(data_package) < 29:
-            print("Invalid package: Too short or empty.")
-            return data_package
-        if data_package[0] != 0x02 or data_package[-1] != 0x03:
-            print("Invalid package: Missing header or end byte.")
-            return data_package
-
-        try:
-            payload = data_package[1:-1]
-
-            card_number_bytes = payload[:10]
-            country_code_bytes = payload[10:14]
-            data_flag = int(payload[14])
-            animal_flag = int(payload[15])
-            reserved = payload[16:20].decode('ascii')
-            user_data = payload[20:26].decode('ascii')
-            checksum = payload[26]
-            checksum_invert = payload[27]
-
-            card_number = int(''.join(reversed(card_number_bytes.decode('ascii'))), 16)
-            country_code = int(''.join(reversed(country_code_bytes.decode('ascii'))), 16)
-
-            calculated_checksum = 0
-            for byte in payload[:-2]:
-                calculated_checksum ^= byte
-            if calculated_checksum != checksum:
-                print(f"Checksum mismatch! Calculated: {calculated_checksum}, Received: {checksum}")
+    def read_tag(self, timeout_ms=None, sleep_ms=2):
+        t0 = int(time.monotonic() * 1000)
+        while True:
+            pkt = self.poll()
+            if pkt:
+                return pkt
+            if timeout_ms is not None and (int(time.monotonic() * 1000) - t0) >= int(timeout_ms):
                 return None
+            time.sleep(sleep_ms / 1000.0)
 
-            return {
-                "card_number": card_number,
-                "country_code": country_code,
-                "data_flag": data_flag,
-                "animal_flag": animal_flag,
-                "reserved": reserved,
-                "user_data": user_data,
-                "checksum": checksum,
-                "checksum_invert": checksum_invert,
-            }
+    # --- io/buffer ---
+    def read_buf(self):
+        try:
+            n = getattr(self.uart, "in_waiting", 0)
+        except AttributeError:
+            n = 0
+        if not n:
+            return
+        chunk = self.uart.read(n)
+        if not chunk:
+            return
+        self.buf.extend(chunk)
+        if len(self.buf) > self.max_len:
+            self.trim_buf()
 
-        except Exception as e:
-            print(f"Error interpreting data package: {e}")
+    def trim_buf(self):
+        self.buf = bytearray(self.buf[-self.max_len:])
+
+    def find_stx(self):
+        try:
+            return self.buf.index(bytes([self.stx]))
+        except ValueError:
+            if len(self.buf) > self.max_len:
+                self.trim_buf()
+            return -1
+
+    def overrun_since(self, i):
+        return (len(self.buf) - i) > self.max_len
+
+    def find_etx_within(self, i):
+        # inclusive window so ETX at i+max_len is allowed
+        stop = min(len(self.buf), i + self.max_len) + 1
+        try:
+            return self.buf.index(bytes([self.etx]), i + 1, stop)
+        except ValueError:
+            return -1
+
+    def extract_frame(self, i, j):
+        frame = bytes(self.buf[i:j + 1])
+        # CircuitPython bytearray may not support slice deletion; reassign instead
+        self.buf = bytearray(self.buf[j + 1:])
+        return frame
+
+    # --- validation/parsing ---
+    def validate_frame(self, frame):
+        if not frame or frame[0] != self.stx or frame[-1] != self.etx:
             return None
+        payload = frame[1:-1]
+        if len(payload) < 2:
+            return None
+        body, csum, inv = payload[:-2], payload[-2], payload[-1]
+        x = 0
+        for b in body:
+            x ^= b
+        if x != csum:
+            if self.verbose:
+                print("RFID: checksum mismatch", x, csum)
+            return None
+        if self.invert_required and ((csum ^ inv) != 0xFF):
+            if self.verbose:
+                print("RFID: checksum invert mismatch")
+            return None
+        return body
+
+    def parse_body(self, body):
+        if self.parser:
+            try:
+                out = self.parser(body)
+                if out:
+                    return out
+                elif self.verbose:
+                    print("parser returned None; falling back to ASCII")
+            except Exception as e:
+                if self.verbose:
+                    print("RFID: parser error", e)
+                # fall through to ASCII fallback
+        try:
+            txt = body.decode("ascii").strip()
+        except Exception:
+            txt = ""
+        return {"id_ascii": (txt or None)}
+
+    def attach_meta(self, pkt, body):
+        pkt["raw_hex"] = body.hex().upper()
+        if "tag_key" not in pkt:
+            # prefer structured id if provided by parser
+            pkt["tag_key"] = pkt.get("card_number") or pkt.get("id_hex") or pkt.get("id_ascii") or pkt["raw_hex"]
+
+    # --- dedup ---
+    def dedup(self, pkt):
+        now_ms = int(time.monotonic() * 1000)
+        key = pkt.get("tag_key")
+        if key == self.last_tag and (now_ms - self.last_ms) < self.repeat_ms:
+            return False
+        self.last_tag, self.last_ms = key, now_ms
+        return True
+
+    # --- resync helpers ---
+    def discard_through(self, i):
+        # Drop up to and including position i; reassign to stay portable
+        self.buf = bytearray(self.buf[i + 1:])
+        if len(self.buf) > self.max_len:
+            self.trim_buf()
 
 
-# Example usage
 if __name__ == "__main__":
-    rfid_reader = MyRFID()
-    rfid_reader.reset()
-    time.sleep(1)
-    x = rfid_reader.read_data_package()
-        
+    rfid = MyRFID()
+    # attach the concrete parser that yields a unique string id
+    rfid.parser = parser_hex_len26
+    rfid.verbose = True  # set False in production
+    print("Starting RFID test... Press Ctrl+C to exit")
+    try:
+        while True:
+            pkt = rfid.poll()
+            if pkt:
+                print("TAG:", pkt)
+            time.sleep(0.01)
+    except KeyboardInterrupt:
+        print("Stopped.")
