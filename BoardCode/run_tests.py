@@ -3,7 +3,7 @@
 
 import time
 from HydraPurr import HydraPurr  # HydraPurr lives at project root  :contentReference[oaicite:0]{index=0}
-from components.MyRFID import MyRFID
+from TagReader import TagReader
 from components.MySystemLog import setup, set_level, DEBUG, INFO, info
 from components.MySystemLog import clear_system_log, tail_to_console
 
@@ -127,9 +127,9 @@ def main():
             elif test == 8:
                 start_time = time.time()
                 info("Test 8: Reading RFID")
-                rfid = MyRFID()
+                reader = TagReader()
                 while True:
-                    pkt = rfid.poll()
+                    reader.poll()
                     time.sleep(0.01)
                     current_time = time.time()
                     elapsed_time = current_time - start_time

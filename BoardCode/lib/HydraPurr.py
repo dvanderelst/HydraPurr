@@ -6,7 +6,6 @@ from components import MyADC
 from components import MyBT
 from components import MyStore
 from components import MyRTC
-from components import MyRFID
 
 from components.MySystemLog import debug, info, warn, error
 from components.MyStore import print_directory
@@ -31,9 +30,6 @@ class HydraPurr:
         self.stores = {}
         # Defines the RTC for timekeeping
         self.rtc = MyRTC()
-        # Defines the RFID reader
-        #self.rfid_reader = MyRFID() -- > Should not be part of this class.
-        # Set up logging for this class
         debug("[HydraPurr] HydraPurr initialized")
 
     # --- read lick ---
@@ -94,14 +90,6 @@ class HydraPurr:
 
     def get_time(self, as_string=False):
         return self.rtc.get_time(as_string=as_string, with_seconds=True)
-
-    # --- read rfid ---
-    def read_rfid(self):
-        data_package = self.rfid_reader.read_data_package()
-        if data_package:
-            interpreted_data = self.rfid_reader.interpret_data_package(data_package)
-            return interpreted_data
-        return None
 
     # --- data logging ---
     def create_data_log(self, filename): #alias for ease

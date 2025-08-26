@@ -64,14 +64,3 @@ class LickCounter:
         # reset lick and bout counters
         self.lick_count = 0; self.bout_count = 0; self.last_lick_end_ms = None
 
-    # def set_params(self, min_lick_ms=None, max_lick_ms=None, min_licks_per_bout=None, max_bout_gap_ms=None, debounce_ms=None):
-    #     # optional: update thresholds at runtime
-    #     if min_lick_ms is not None: self.min_lick_ms = int(min_lick_ms)
-    #     if max_lick_ms is not None: self.max_lick_ms = int(max_lick_ms)
-    #     if min_licks_per_bout is not None: self.min_licks_per_bout = int(min_licks_per_bout)
-    #     if max_bout_gap_ms is not None: self.max_bout_gap_ms = int(max_bout_gap_ms)
-    #     if debounce_ms is not None: self.debounce_ms = int(debounce_ms)
-    #
-
-    
-        

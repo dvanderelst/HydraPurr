@@ -11,15 +11,10 @@ from .MyBT import MyBT           # from myBT.py import class myBT
 from .MyDigital import MyDigital # from myDigital.py import class myDigital
 from .MyOLED import MyOLED       # from myOLED.py import class myOLED
 from .MyPixel import MyPixel     # from myPixel.py import class myPixel
-from .MyRFID import MyRFID       # from myRFID.py import class myRFID
 from .MyRTC import MyRTC         # from myRTC.py import class myRTC
 from .MyStore import MyStore     # from myStore.py import class myStore
 
 # __all__ defines what gets imported when someone does:
 #   from components import *
 # This prevents extra things (like helper functions) from leaking out.
-__all__ = [
-    "MyADC", "MyBT", "MyDigital",
-    "MyOLED", "MyPixel", "MyRFID",
-    "MyRTC", "MyStore"
-]
+__all__ = ["MyADC", "MyBT", "MyDigital", "MyOLED", "MyPixel", "MyRTC", "MyStore"]

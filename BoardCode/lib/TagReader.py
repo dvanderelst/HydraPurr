@@ -42,7 +42,7 @@ def parser_hex_len26(body):
     }
 
 
-class MyRFID:
+class TagReader:
     """Cooperative STX/ETX RFID reader with small, focused helpers.
     Emits activity to components.MySystemLog (debug/info/warn/error).
     """
