@@ -1,11 +1,8 @@
 import time
 import board
 import busio
-
-try:
-    from components import MyDigital
-except Exception:
-    MyDigital = None
+from components import MyDigital
+from components.MySystemLog import debug, info, warn, error
 
 
 # --- simple, robust parser ---
@@ -46,7 +43,9 @@ def parser_hex_len26(body):
 
 
 class MyRFID:
-    """Cooperative STX/ETX RFID reader with small, focused helpers."""
+    """Cooperative STX/ETX RFID reader with small, focused helpers.
+    Emits activity to components.MySystemLog (debug/info/warn/error).
+    """
 
     def __init__(self):
         # pins (fixed defaults)
@@ -55,18 +54,17 @@ class MyRFID:
 
         # hardware objects
         self.uart = busio.UART(rx=self.rx_pin, tx=None, baudrate=9600, timeout=0)
-        self.rst = MyDigital(self.rst_pin, direction="output") if (MyDigital and self.rst_pin) else None
-        if self.rst:
-            # Transistor: gate HIGH pulls module RST to GND (active-high reset)
-            # Idle LOW so the module runs
-            self.rst.write(False)
+        self.rst = MyDigital(self.rst_pin, direction="output")
+        self.rst.write(False)
+
+        info("[RFID] init: rx=%s rst=%s baud=9600" % (str(self.rx_pin), str(self.rst_pin)))
 
         # defaults
         self.buf = bytearray()
         self.max_len = 64
         self.repeat_ms = 500
         self.verbose = False
-        self.parser = None  # attach e.g. parser_hex_len26
+        self.parser = parser_hex_len26
         self.invert_required = True
         self.stx, self.etx = 0x02, 0x03
         self.last_tag = None
@@ -77,25 +75,26 @@ class MyRFID:
 
     # --- public ---
     def reset(self):
-        if not self.rst:
-            return
-        if self.verbose:
-            print("reset")
+        if not self.rst: return
+        debug("[RFID] reset: assert")
         # Assert reset via transistor (gate HIGH pulls module RST to GND)
         self.rst.write(True)
         time.sleep(self.reset_pulse_ms / 1000.0)
         # Release reset (idle LOW on the transistor gate)
         self.rst.write(False)
+        debug("[RFID] reset: release; flush UART")
         # Flush UART and parser buffer after reset
-        try:
-            n = getattr(self.uart, "in_waiting", 0)
-        except AttributeError:
-            n = 0
+        try: n = getattr(self.uart, "in_waiting", 0)
+        except AttributeError: n = 0
         if n:
-            _ = self.uart.read(n)
+            try:
+                _ = self.uart.read(n)
+            except Exception as e:
+                warn("[RFID] reset: uart flush failed: %r" % (e,))
         self.buf = bytearray()
         # Short settle so the module is ready to speak again
         time.sleep(self.reset_settle_ms / 1000.0)
+        debug("[RFID] reset: settled")
 
     def poll(self):
         """Try to read one RFID frame and return it as dict, or None if not ready.
@@ -117,6 +116,7 @@ class MyRFID:
         if i < 0:
             return None
         if self.overrun_since(i):
+            warn("[RFID] overrun: STX at %d, tail=%d > max_len=%d → resync" % (i, len(self.buf)-i, self.max_len))
             self.discard_through(i)
             return None
         j = self.find_etx_within(i)
@@ -128,10 +128,13 @@ class MyRFID:
             return None
         pkt = self.parse_body(body)
         if pkt is None:
+            warn("[RFID] parser returned None; dropping frame")
             return None
         self.attach_meta(pkt, body)
         if not self.dedup(pkt):
+            debug("[RFID] duplicate suppressed: %s" % (pkt.get("tag_key"),))
             return None
+        info("[RFID] tag: %s" % (pkt.get("tag_key"),))
         # Re‑arm the reader for next read
         self.reset()
         return pkt
@@ -158,6 +161,7 @@ class MyRFID:
         if not chunk:
             return
         self.buf.extend(chunk)
+        debug("[RFID] read %dB → buf=%dB" % (len(chunk), len(self.buf)))
         if len(self.buf) > self.max_len:
             self.trim_buf()
 
@@ -201,12 +205,10 @@ class MyRFID:
         for b in body:
             x ^= b
         if x != csum:
-            if self.verbose:
-                print("RFID: checksum mismatch", x, csum)
+            warn("[RFID] checksum mismatch calc=%d pkt=%d" % (x, csum))
             return None
         if self.invert_required and ((csum ^ inv) != 0xFF):
-            if self.verbose:
-                print("RFID: checksum invert mismatch")
+            warn("[RFID] checksum invert mismatch: csum=%d inv=%d" % (csum, inv))
             return None
         return body
 
@@ -216,12 +218,11 @@ class MyRFID:
                 out = self.parser(body)
                 if out:
                     return out
-                elif self.verbose:
-                    print("parser returned None; falling back to ASCII")
+                else:
+                    warn("[RFID] parser returned None")
             except Exception as e:
-                if self.verbose:
-                    print("RFID: parser error", e)
-                # fall through to ASCII fallback
+                error("[RFID] parser error: %r" % (e,))
+                return None
         try:
             txt = body.decode("ascii").strip()
         except Exception:
@@ -251,17 +252,4 @@ class MyRFID:
             self.trim_buf()
 
 
-if __name__ == "__main__":
-    rfid = MyRFID()
-    # attach the concrete parser that yields a unique string id
-    rfid.parser = parser_hex_len26
-    rfid.verbose = True  # set False in production
-    print("Starting RFID test... Press Ctrl+C to exit")
-    try:
-        while True:
-            pkt = rfid.poll()
-            if pkt:
-                print("TAG:", pkt)
-            time.sleep(0.01)
-    except KeyboardInterrupt:
-        print("Stopped.")
+

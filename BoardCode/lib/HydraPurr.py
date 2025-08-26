@@ -9,7 +9,6 @@ from components import MyRTC
 from components import MyRFID
 
 from components.MySystemLog import debug, info, warn, error
-from components.MySystemLog import clear_system_log
 from components.MyStore import print_directory
 
 class HydraPurr:
@@ -33,15 +32,9 @@ class HydraPurr:
         # Defines the RTC for timekeeping
         self.rtc = MyRTC()
         # Defines the RFID reader
-        self.rfid_reader = MyRFID()
+        #self.rfid_reader = MyRFID() -- > Should not be part of this class.
         # Set up logging for this class
         debug("[HydraPurr] HydraPurr initialized")
-
-    # --- clear system log ---
-    @staticmethod
-    def clear_system_log(): # alias for ease
-        clear_system_log()
-        debug("[HydraPurr] System Log cleared")
 
     # --- read lick ---
     def read_lick(self, binary=True):

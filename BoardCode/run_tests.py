@@ -3,6 +3,7 @@
 
 import time
 from HydraPurr import HydraPurr  # HydraPurr lives at project root  :contentReference[oaicite:0]{index=0}
+from components.MyRFID import MyRFID
 from components.MySystemLog import setup, set_level, DEBUG, INFO, info
 from components.MySystemLog import clear_system_log, tail_to_console
 
@@ -17,7 +18,7 @@ from components.MySystemLog import clear_system_log, tail_to_console
 # 6 -> writing to SD (log file)
 # 7 -> set/get RTC time
 # 8 -> RFID module
-TESTS = [6]
+TESTS = [8]
 
 
 setup(filename="system.log", autosync=True)
@@ -124,15 +125,15 @@ def main():
                 info("Test 7 completed.")
 
             elif test == 8:
-                # RFID read (limited attempts)
-                info("Test 8: RFID read (5 attempts).")
-                for i in range(5):
-                    data = hp.read_rfid()
-                    if data is None:
-                        print(" No valid package.")
-                    else:
-                        print(" Interpreted:", data)
-                    time.sleep(2)
+                start_time = time.time()
+                info("Test 8: Reading RFID")
+                rfid = MyRFID()
+                while True:
+                    pkt = rfid.poll()
+                    time.sleep(0.01)
+                    current_time = time.time()
+                    elapsed_time = current_time - start_time
+                    if elapsed_time > 30: break
                 info("Test 8 completed.")
 
             else:
