@@ -18,7 +18,7 @@ from components.MySystemLog import clear_system_log, tail_to_console
 # 6 -> writing to SD (log file)
 # 7 -> set/get RTC time
 # 8 -> RFID module
-TESTS = [8]
+TESTS = [2]
 
 
 setup(filename="system.log", autosync=True)
@@ -56,10 +56,12 @@ def main():
 
             elif test == 2:
                 # Screen test
-                info("Test 2: Writing numbers 0..9 to OLED.")
-                for x in range(10):
-                    hp.screen_write(str(x), x=5, y=0, scale=2, clear=True)
+                info("Test 2: Writing numbers 0..3 to OLED.")
+                for x in range(4):
+                    hp.write(str(x), x=5, y=0)
                     time.sleep(1)
+                hp.clear_screen()
+                hp.write_line(0, 'test line')
                 print("Test 2 completed.")
 
             elif test == 3:
@@ -146,7 +148,8 @@ def main():
 
         time.sleep(2)
         info(f"=== Finished Test {test} ===")
+    return hp
 
 if __name__ == "__main__":
-    main()
+    hp = main()
     tail_to_console()

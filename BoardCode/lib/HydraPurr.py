@@ -67,9 +67,17 @@ class HydraPurr:
         debug('[HydraPurr] Feeder toggle')
 
     # --- screen ---
-    def screen_write(self, text, x=0, y=0, scale=None, clear=True):
-        self.screen.write(text, x, y, scale=scale, clear=clear)
+    def write(self, text, x=0, y=0):
+        self.screen.write(str(text), x, y)
         debug(f'[HydraPurr] Screen write: {text}')
+    
+    def write_line(self, line_nr, text):
+        self.screen.write_line(line_nr, str(text))
+        debug(f'[HydraPurr] Line write: {text}')
+        
+    def clear_screen(self):
+        self.screen.clear()
+        debug(f'[HydraPurr] Cleared screen')
 
     # --- water level ---
     def read_water_level(self, samples=50, dt=0.001):

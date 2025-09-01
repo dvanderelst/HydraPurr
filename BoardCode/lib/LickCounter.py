@@ -65,12 +65,16 @@ class LickCounter:
         # reset lick and bout counters
         self.lick_count = 0; self.bout_count = 0; self.last_lick_end_ms = None
         
-    def get_state(self):
+    def get_state(self, beautify=False):
         part0 = str(self.name)
         part1 = str(self.lick_count)
         part2 = str(self.bout_count)
-        state = part0 + '_' + part1 + '_' + part2
-        return state
+        if not beautify:
+            state = part0 + '_' + part1 + '_' + part2
+            return state
+        else:
+            state = f'{part0}" licks {part1}, bouts {part2}'
+            return state
         
         
 
