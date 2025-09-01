@@ -129,11 +129,12 @@ def main():
                 info("Test 8: Reading RFID")
                 reader = TagReader()
                 while True:
-                    reader.poll()
-                    time.sleep(0.01)
+                    reader.reset()
+                    time.sleep(3)
+                    
                     current_time = time.time()
                     elapsed_time = current_time - start_time
-                    if elapsed_time > 30: break
+                    if elapsed_time > 1000: break
                 info("Test 8 completed.")
 
             else:

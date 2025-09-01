@@ -3,7 +3,7 @@ from components.MyStore import MyStore
 
 
 class LickCounter:
-    def __init__(self, clear_log=False, fname="licks.csv"):
+    def __init__(self, name=None, clear_log=False, fname="licks.csv"):
         # thresholds and state
         self.min_lick_ms = 50
         self.max_lick_ms = 150
@@ -17,18 +17,19 @@ class LickCounter:
         self.candidate_since = None
         self.state_since = time.monotonic() * 1000.0
         self.last_lick_end_ms = None
+        self.name = str(name)
         # logging: ISO timestamps with milliseconds, header auto if file is new/empty
-        header = ["state","licks","bouts"]
+        header = ["name", "state","licks","bouts"]
         self.store = MyStore(fname, fmt='iso', with_ms=True, auto_header=header, time_label="time")
         if clear_log:
             self.store.empty()
             self.store.header(header, label="time")
-        self.last_logged = (None, None, None)
+        self.last_logged = (None, None, None, None)
     
-    def read(self):
+    def read_data_log(self):
         lines = self.store.read()
         return lines
-
+    
     def accept_state(self, s, t_ms):
         # accept state transition, update lick/bout counters
         prev, dur_ms = self.state, (t_ms - self.state_since)
@@ -53,7 +54,7 @@ class LickCounter:
 
         current = (s, self.lick_count, self.bout_count)
         if current != self.last_logged:
-            self.store.add([s, self.lick_count, self.bout_count])   # timestamp auto-prepended by MyStore
+            self.store.add([self.name, s, self.lick_count, self.bout_count])   # timestamp auto-prepended by MyStore
             self.last_logged = current
 
     def get_bout_count(self): 
@@ -63,4 +64,13 @@ class LickCounter:
     def reset_counters(self):
         # reset lick and bout counters
         self.lick_count = 0; self.bout_count = 0; self.last_lick_end_ms = None
+        
+    def get_state(self):
+        part0 = str(self.name)
+        part1 = str(self.lick_count)
+        part2 = str(self.bout_count)
+        state = part0 + '_' + part1 + '_' + part2
+        return state
+        
+        
 

@@ -35,7 +35,7 @@ def parser_hex_len26(body):
         id_int_le = None
 
     return {
-        "id_hex": up,
+        "tag": up,
         "id_int_be": id_int_be,
         "id_int_le": id_int_le,
         "tag_key": up,
@@ -62,7 +62,7 @@ class TagReader:
         # defaults
         self.buf = bytearray()
         self.max_len = 64
-        self.repeat_ms = 500
+        self.repeat_ms = 100 #Suppress duplicates within repeat_ms window.
         self.verbose = False
         self.parser = parser_hex_len26
         self.invert_required = True
@@ -70,7 +70,7 @@ class TagReader:
         self.last_tag = None
         self.last_ms = 0
         # Reset timing (active-high via transistor)
-        self.reset_pulse_ms = 50
+        self.reset_pulse_ms = 75
         self.reset_settle_ms = 80
 
     # --- public ---
@@ -96,7 +96,7 @@ class TagReader:
         time.sleep(self.reset_settle_ms / 1000.0)
         debug("[RFID] reset: settled")
 
-    def poll(self):
+    def poll(self, reset_after=False):
         """Try to read one RFID frame and return it as dict, or None if not ready.
         Steps:
           1. Read any available UART bytes into buffer.
@@ -136,7 +136,7 @@ class TagReader:
             return None
         info("[RFID] tag: %s" % (pkt.get("tag_key"),))
         # Re‑arm the reader for next read
-        self.reset()
+        if reset_after: self.reset()
         return pkt
 
     def read_tag(self, timeout_ms=None, sleep_ms=2):
