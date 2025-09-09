@@ -4,18 +4,6 @@ from TagReader import TagReader
 from components.MySystemLog import setup, set_level, DEBUG, info
 from components.MySystemLog import clear_system_log, read_log
 
-
-# Select which tests to run (same numbering as the old script)
-# 0 -> blinking indicator LED
-# 1 -> switching relay
-# 2 -> screen test
-# 3 -> water level reading
-# 4 -> Bluetooth module
-# 5 -> lick detection
-# 6 -> writing to SD (log file)
-# 7 -> set/get RTC time
-# 8 -> RFID module
-
 def test_log(number, message, function=info):
     line = f"[Test {number}] {message}"
     function(line)
@@ -119,26 +107,4 @@ def main(selected_tests, clear_log=True):
                 logline1 = " Current time (string):" + str(hp.get_time(as_string=True))
                 logline2 = " Current time (dict):" + str(hp.get_time(as_string=False))
                 test_log(7, logline1)
-                test_log(7, logline2)
-                test_log(7, "Done")
-
-            elif test == 8:
-                start_time = time.time()
-                test_log(8, 'RFID reader')
-                reader = TagReader()
-                reader.reset_now()
-                while True:
-                    reader.poll()
-                    current_time = time.time()
-                    elapsed_time = current_time - start_time
-                    if elapsed_time > 10: break
-                test_log(8, "Done")
-
-        except Exception as e: info(f"[ERROR] Test {test} raised: {e}")
-        time.sleep(2)
-    log = read_log()
-    return hp, log
-
-# if __name__ == "__main__":
-#     hp = main()
-#     tail_to_console()
+                t

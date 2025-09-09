@@ -63,7 +63,7 @@ class TagReader:
         self.rst = MyDigital(self.rst_pin, direction="output")
         self.rst.write(False)  # idle (not asserting reset)
 
-        info(f"[RFID] init: rx={self.rx_pin} rst={self.rst_pin} baud={self.baudrate}")
+        debug(f"[RFID] init: rx={self.rx_pin} rst={self.rst_pin} baud={self.baudrate}")
 
         # ---------------- Framing & validation (hardcoded) -------------------
         self.stx = 0x02
@@ -270,5 +270,5 @@ class TagReader:
             debug(f"[RFID] duplicate suppressed: {key}")
             return None
 
-        info(f"[RFID] tag: {key}")
+        debug(f"[RFID] tag: {key}")
         return pkt

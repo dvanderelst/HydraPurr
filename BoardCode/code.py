@@ -1,5 +1,9 @@
 import Tests
+import MainLoop
+from components.MySystemLog import DEBUG, INFO, WARN, ERROR
 
+print('Running...')
+tests_to_run = []
 # Select which tests to run (same numbering as the old script)
 # 0 -> blinking indicator LED
 # 1 -> switching relay
@@ -10,5 +14,5 @@ import Tests
 # 6 -> writing to SD (log file)
 # 7 -> set/get RTC time
 # 8 -> RFID module
-tests_to_run = [5]
 if len(tests_to_run) > 0: hp, log = Tests.main(tests_to_run)
+else: MainLoop.main_loop(level=INFO)

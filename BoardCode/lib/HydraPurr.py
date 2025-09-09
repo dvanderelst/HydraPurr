@@ -37,7 +37,7 @@ class HydraPurr:
         lick_value = self.lick.read()
         lick_threshold = self.lick_threshold
         if binary: lick_value = 1 if lick_value < lick_threshold else 0
-        debug(f'[HydraPurr] Lick value: {lick_value}, binary: {binary}')
+        #debug(f'[HydraPurr] Lick value: {lick_value}, binary: {binary}')
         return lick_value
 
     # --- indicator LED control ---
