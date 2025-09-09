@@ -57,7 +57,7 @@ def set_mem_max(n):
         pass
 
 def _fmt(level_name, msg):
-    return f"[{_ts()}] {level_name}: {msg}"
+    return f"[{_ts()}] {level_name}:{msg}"
 
 def _emit(line):
     global _mem_buf
@@ -81,19 +81,19 @@ _def_join = lambda parts: " ".join(str(p) for p in parts)
 
 def debug(*parts):
     if _level <= DEBUG:
-        _emit(_fmt("DEBUG\t", _def_join(parts)))
+        _emit(_fmt("DEBUG ", _def_join(parts)))
 
 def info(*parts):
     if _level <= INFO:
-        _emit(_fmt("INFO\t", _def_join(parts)))
+        _emit(_fmt("INFO  ", _def_join(parts)))
 
 def warn(*parts):
     if _level <= WARN:
-        _emit(_fmt("WARN\t", _def_join(parts)))
+        _emit(_fmt("WARN  ", _def_join(parts)))
 
 def error(*parts):
     if _level <= ERROR:
-        _emit(_fmt("ERROR\t", _def_join(parts)))
+        _emit(_fmt("ERROR ", _def_join(parts)))
 
 def critical(*parts):
     msg = _def_join(parts)
@@ -226,7 +226,7 @@ class _TeeSink:
 
 # ---------------- setup / teardown ----------------
 
-def setup(filename="system.log", autosync=True, keep_open=True):
+def setup(filename="system.log", autosync=True, keep_open=True, quiet=False):
     """Initialize logging. Returns True if logging to SD, else False (console-only)."""
     global _sink, _sd_ok, _log_path
     from components.MyStore import mount_sd
@@ -246,7 +246,7 @@ def setup(filename="system.log", autosync=True, keep_open=True):
                 _sink = _TeeSink(sd_sink, _PrintSink())
             else:
                 _sink = sd_sink
-            info("[MySystemLog] Logging to SD:", path)
+            if not quiet: info("[MySystemLog] Logging to SD:", path)
             return True
         except Exception as e:
             print("[MySystemLog] SD sink init failed:", repr(e))
@@ -292,11 +292,10 @@ def clear_system_log():
     except:
         pass
     try:
-        with open(_log_path, "w") as f:
-            f.write("")
-        print("[MySystemLog] System log cleared")
+        with open(_log_path, "w") as f: f.write("")
         # re-setup with same filename
-        setup(_log_path.split("/")[-1], autosync=True, keep_open=True)
+        setup(_log_path.split("/")[-1], autosync=True, keep_open=True, quiet=True)
+        info("[MySystemLog] System log cleared")
         return True
     except Exception as e:
         print("[MySystemLog] Clear failed:", repr(e))
