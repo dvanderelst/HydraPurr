@@ -1,8 +1,8 @@
 import Tests
 import MainLoop
 from components.MySystemLog import DEBUG, INFO, WARN, ERROR
-import LickCounterMultiple
-lcm = LickCounterMultiple.LickCounter(cat_names=['cat1', 'cat2', 'cat3'], clear_log=True)
+import LickCounter
+lcm = LickCounter.LickCounter(cat_names=['cat1', 'cat2', 'cat3'], clear_log=True)
 
 # print('Running...')
 # tests_to_run = []
