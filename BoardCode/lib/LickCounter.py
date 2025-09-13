@@ -2,7 +2,7 @@ import time
 from components.MyStore import MyStore
 
 
-def now(): return time.monotonic() * 1000.0
+def now_ms(): return time.monotonic() * 1000.0
 
 
 class LickState:
@@ -11,7 +11,7 @@ class LickState:
         self.lick_count = 0
         self.bout_count = 0
         self.state = 0  # debounced (accepted) state
-        self.state_since = now()
+        self.state_since = now_ms()
         self.candidate_state = 0  # raw candidate state
         self.candidate_since = None
         self.last_lick_end_ms = None
@@ -28,7 +28,7 @@ class LickState:
         Feed one raw sample (0/1).
         Returns: (prev, curr, duration_ms, lick_added, bout_closed)
         """
-        current_time = now()
+        current_time = now_ms()
         previous, current, duration = self.debounce_state(sample)
 
         lick_added = False
@@ -54,7 +54,7 @@ class LickState:
         return previous, current, duration, lick_added, bout_closed
 
     def debounce_state(self, sample):
-        t = now()
+        t = now_ms()
         previous_state = self.state
         duration = t - self.state_since  # how long current state has been held
 
@@ -78,7 +78,7 @@ class LickState:
         return previous_state, self.state, duration
 
     def end_bout(self, hard=True, finalize_current_lick=True):
-        current_time = now()
+        current_time = now_ms()
         lick_finalized = False
         lick_duration = None
         bout_closed = False
