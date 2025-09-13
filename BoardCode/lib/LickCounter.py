@@ -3,7 +3,7 @@ from components.MyStore import MyStore
 
 
 class LickCounter:
-    def __init__(self, name=None, clear_log=False, fname="licks.csv"):
+    def __init__(self, cat_name=None, clear_log=False, file_name="licks.csv"):
         # thresholds and state
         self.min_lick_ms = 50
         self.max_lick_ms = 150
@@ -17,10 +17,10 @@ class LickCounter:
         self.candidate_since = None
         self.state_since = time.monotonic() * 1000.0
         self.last_lick_end_ms = None
-        self.name = str(name)
+        self.cat_name = str(cat_name)
         # logging: ISO timestamps with milliseconds, header auto if file is new/empty
-        header = ["name", "state","licks","bouts"]
-        self.store = MyStore(fname, fmt='iso', with_ms=True, auto_header=header, time_label="time")
+        header = ["cat_name", "state","licks","bouts"]
+        self.store = MyStore(file_name, fmt='iso', with_ms=True, auto_header=header, time_label="time")
         if clear_log:
             self.store.empty()
             self.store.header(header, label="time")
@@ -54,7 +54,7 @@ class LickCounter:
 
         current = (s, self.lick_count, self.bout_count)
         if current != self.last_logged:
-            self.store.add([self.name, s, self.lick_count, self.bout_count])   # timestamp auto-prepended by MyStore
+            self.store.add([self.cat_name, s, self.lick_count, self.bout_count])   # timestamp auto-prepended by MyStore
             self.last_logged = current
 
     def get_bout_count(self): 
@@ -66,7 +66,7 @@ class LickCounter:
         self.lick_count = 0; self.bout_count = 0; self.last_lick_end_ms = None
         
     def get_state(self, beautify=False):
-        part0 = str(self.name)
+        part0 = str(self.cat_name)
         part1 = str(self.lick_count)
         part2 = str(self.bout_count)
         if not beautify:

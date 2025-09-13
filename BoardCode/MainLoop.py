@@ -33,8 +33,8 @@ def main_loop(clear_log=True, level=INFO):
     hydrapurr = HydraPurr()
     pixel = MyPixel()
 
-    lickcounters = {name: LickCounter(name=name) for name in all_cat_names}
-    if not TAG_REQUIRED: lickcounters.setdefault("unknown", LickCounter(name="unknown"))
+    lickcounters = {name: LickCounter(cat_name=name) for name in all_cat_names}
+    if not TAG_REQUIRED: lickcounters.setdefault("unknown", LickCounter(cat_name="unknown"))
 
     # pixel control
     pixel.toggle_colors = ['red', 'green', 'blue']
@@ -141,7 +141,7 @@ def main_loop(clear_log=True, level=INFO):
         else:
             # Logger mode: count always; stamp by current/unknown
             name = active_name if gate_on and (active_name is not None) else "unknown"
-            ctr = lickcounters.setdefault(name, LickCounter(name=name))
+            ctr = lickcounters.setdefault(name, LickCounter(cat_name=name))
             ctr.process_sample(lick_state)
             current_ctr_state = ctr.get_state()
             if previous_ctr_state != current_ctr_state:
