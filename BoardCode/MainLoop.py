@@ -47,9 +47,11 @@ def main_loop(clear_log=True, level=DEBUG):
         bout_changed = False
         
         current_time = now_ms()
-        if current_time - last_pixel_toggle > 500:
-            hydrapurr.pixel_cycle()
-            last_pixel_toggle = current_time
+        # if current_time - last_pixel_toggle > 500:
+        #     hydrapurr.pixel_cycle()
+        #     last_pixel_toggle = current_time
+
+        hydrapurr.heartbeat()
 
         # --- Get the active cat --------------------------------------
         pkt = reader.poll_active()

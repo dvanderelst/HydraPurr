@@ -1,5 +1,6 @@
 import board
 from adafruit_other import neopixel
+import math, time
 
 # Preset colors with more comprehensive set
 PRESET_COLORS = {
@@ -37,7 +38,7 @@ class MyPixel:
         self._brightness = brightness
         self.toggle_colors = []
         self.color_index = 0
-    
+
     def cycle(self, brightness=None):
         nr_colors = len(self.toggle_colors)
         if nr_colors == 0: return
@@ -45,7 +46,18 @@ class MyPixel:
         self.set_color(color, brightness)
         self.color_index = self.color_index + 1
         if self.color_index == nr_colors: self.color_index = 0
-        
+
+    def heartbeat(self, base_color="blue"):
+
+        min_brightness = 0.1
+        max_brightness = 0.8
+        heartbeat_cycle_ms = 3000
+
+        t = time.monotonic() * 1000.0
+        phase = (t % heartbeat_cycle_ms) / heartbeat_cycle_ms
+        wave = 0.5 * (1 - math.cos(2 * math.pi * phase))  # 0..1
+        brightness = min_brightness + (max_brightness - min_brightness) * wave
+        self.set_color(base_color, brightness)
 
     def set_color(self, color_name, brightness=None):
         """
@@ -117,4 +129,49 @@ class MyPixel:
         """
         import time
         
-      
+        for _ in range(times):
+            self.set_color(color_name)
+            time.sleep(duration)
+            self.turn_off()
+            time.sleep(duration)
+
+    def rainbow_cycle(self, cycles=5, delay=0.05):
+        """
+        Create a rainbow cycle effect.
+        
+        :param cycles: Number of rainbow cycles (default: 5)
+        :param delay: Delay between color changes (default: 0.05)
+        """
+        import time
+        
+        for _ in range(cycles):
+            for j in range(255):
+                self.pixels.fill(self._wheel(j & 255))
+                time.sleep(delay)
+        
+        self.turn_off()
+
+    def _wheel(self, pos):
+        """
+        Generate color wheel for rainbow effect.
+        
+        :param pos: Position on the color wheel (0-255)
+        :return: RGB color tuple
+        """
+        if pos < 85:
+            return (pos * 3, 255 - pos * 3, 0)
+        elif pos < 170:
+            pos -= 85
+            return (255 - pos * 3, 0, pos * 3)
+        else:
+            pos -= 170
+            return (0, pos * 3, 255 - pos * 3)
+
+    def __str__(self):
+        """
+        String representation of the NeoPixel controller.
+        
+        :return: Current color and brightness information
+        """
+        current_color = self.pixels[0]
+        return f"NeoPixel: Color RGB{current_color}, Brightness: {self._brightness}"

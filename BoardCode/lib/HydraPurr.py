@@ -117,6 +117,10 @@ class HydraPurr:
         self.pixel.set_color(color_name, brightness)
         debug(f'[HydraPurr] Pixel set color: {color_name} with brightness {brightness}')
 
+    def heartbeat(self, base_color='blue'):
+        self.pixel.heartbeat(base_color)
+        debug(f'[HydraPurr] Pixel heartbeat with base color: {base_color}')
+
     # --- data logging ---
     def create_data_log(self, filename): #alias for ease
         return self.select_data_log(filename)
