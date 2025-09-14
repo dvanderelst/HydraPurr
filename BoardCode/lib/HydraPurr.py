@@ -19,6 +19,7 @@ class HydraPurr:
         # Defines the OLED screen
         self.screen = MyOLED()
         self.screen.set_rotation(False)
+        self.screen.auto_show = False
         # Defines the water level sensor
         self.water_level = MyADC(0)
         # Defines the Bluetooth hardware module
@@ -78,6 +79,9 @@ class HydraPurr:
     def clear_screen(self):
         self.screen.clear()
         debug(f'[HydraPurr] Cleared screen')
+    
+    def show_screen(self):
+        self.screen.show()
 
     # --- water level ---
     def read_water_level(self, samples=50, dt=0.001):

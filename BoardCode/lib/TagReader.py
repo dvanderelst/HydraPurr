@@ -10,10 +10,11 @@
 # - Sticky helpers: active_tag(timeout_ms), poll_active(timeout_ms)
 
 import time, board, busio
+import Settings
 from components import MyDigital
 from components.MySystemLog import debug, warn, error
 
-MAX_READ_HZ = 3.0  # change here to adjust read refresh limit (Hz)
+
 
 def parser_hex_len26(body: bytes):
     try: up = body.decode("ascii").strip().upper()
@@ -44,7 +45,8 @@ class TagReader:
         t0 = self.now_ms(); self.next_reset_ms = (t0+self.period_ms) if self.period_ms else 0
         self.rst_state, self.rst_until_ms = "idle", 0
         # --- Read-rate limiter & cache ---------------------------------------
-        self.refresh_ms = int(1000/MAX_READ_HZ) if MAX_READ_HZ>0 else 0
+        max_tag_read_hz = Settings.max_tag_read_hz
+        self.refresh_ms = int(1000/max_tag_read_hz) if max_tag_read_hz>0 else 0
         self.last_attempt_ms, self.last_pkt = 0, None
         self.cache_on_fail = False        # hardcoded
         self.reset_on_success = True      # hardcoded
@@ -168,6 +170,7 @@ class TagReader:
         now=self.now_ms()
         return self.last_success_pkt if (self.last_success_pkt and (now - self.last_success_ms) < timeout_ms) else None
 
-    def poll_active(self, timeout_ms):
+    def poll_active(self, cat_timeout_ms=None):
+        if cat_timeout_ms is None: cat_timeout_ms = Settings.cat_timeout_ms
         _ = self.poll()  # may update last_success_* if we got a fresh read
-        return self.active_tag(timeout_ms)
+        return self.active_tag(cat_timeout_ms)

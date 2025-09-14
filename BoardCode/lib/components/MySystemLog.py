@@ -57,7 +57,7 @@ def set_mem_max(n):
         pass
 
 def _fmt(level_name, msg):
-    return f"[{_ts()}] {level_name}:{msg}"
+    return f"[{_ts()}] {level_name}: {msg}"
 
 def _emit(line):
     global _mem_buf
