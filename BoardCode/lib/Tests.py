@@ -1,4 +1,5 @@
 import time
+import sys
 from HydraPurr import HydraPurr
 from TagReader import TagReader
 from components.MySystemLog import setup, set_level, DEBUG, info
@@ -107,4 +108,28 @@ def main(selected_tests, clear_log=True):
                 logline1 = " Current time (string):" + str(hp.get_time(as_string=True))
                 logline2 = " Current time (dict):" + str(hp.get_time(as_string=False))
                 test_log(7, logline1)
-                t
+                test_log(7, logline2)
+                test_log(7, "Done")
+
+            elif test == 8:
+                start_time = time.time()
+                test_log(8, 'RFID reader')
+                reader = TagReader()
+                reader.reset_now()
+                while True:
+                    reader.poll()
+                    current_time = time.time()
+                    elapsed_time = current_time - start_time
+                    if elapsed_time > 10: break
+                test_log(8, "Done")
+
+        except Exception as e:
+            info(f"[ERROR] Test {test} raised: {e}")
+            sys.print_exception(e)
+        time.sleep(2)
+    log = read_log()
+    return hp, log
+
+# if __name__ == "__main__":
+#     hp = main()
+#     tail_to_console()
