@@ -6,6 +6,7 @@ from components import MyADC
 from components import MyBT
 from components import MyStore
 from components import MyRTC
+from components import MyPixel
 
 from components.MySystemLog import debug, info, warn, error
 from components.MyStore import print_directory
@@ -32,6 +33,10 @@ class HydraPurr:
         # Defines the RTC for timekeeping
         self.rtc = MyRTC()
         debug("[HydraPurr] HydraPurr initialized")
+        # Defines the NeoPixel for visual feedback
+        self.pixel = MyPixel(num_pixels=1, brightness=0.2)
+        self.pixel.toggle_colors = ['red', 'green', 'blue', 'yellow', 'cyan', 'magenta', 'white', 'off']
+        self.pixel.color_index = 0
 
     # --- read lick ---
     def read_lick(self, binary=True):
@@ -102,6 +107,15 @@ class HydraPurr:
 
     def get_time(self, as_string=False):
         return self.rtc.get_time(as_string=as_string, with_seconds=True)
+
+    # --- NeoPixel ---
+    def pixel_cycle(self, brightness=None):
+        self.pixel.cycle(brightness)
+        debug('[HydraPurr] Pixel cycle')
+
+    def pixel_set_color(self, color_name, brightness=None):
+        self.pixel.set_color(color_name, brightness)
+        debug(f'[HydraPurr] Pixel set color: {color_name} with brightness {brightness}')
 
     # --- data logging ---
     def create_data_log(self, filename): #alias for ease

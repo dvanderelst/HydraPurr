@@ -1,10 +1,10 @@
 import time
 
 import Cats
+import Settings
 from components.MySystemLog import setup, set_level, DEBUG, INFO, WARN, ERROR
 from components.MySystemLog import clear_system_log
 from components.MySystemLog import debug, info, warn, error
-from components.MyPixel import MyPixel
 
 from LickCounter import LickCounter
 from TagReader import TagReader     # new non-blocking, scheduled-reset version
@@ -31,16 +31,14 @@ def main_loop(clear_log=True, level=DEBUG):
     info(f'[Main Loop] all defined cats: {all_cat_names}')
     # Hardware / objects
     hydrapurr = HydraPurr()
-    reader = TagReader()        
-    pixel = MyPixel()
+    reader = TagReader()
     counter = LickCounter(cat_names=all_cat_names, clear_log=clear_log)
 
     # pixel control
-    pixel.toggle_colors = ['red', 'green', 'blue']
     last_pixel_toggle = now_ms()
     # Presence/attribution state
     previous_lick_state_string = None
-    previous_active_cat = None
+    previous_active_cat = None  # no cat at start
     previous_bout_count = 0
 
     while True:
@@ -50,7 +48,7 @@ def main_loop(clear_log=True, level=DEBUG):
         
         current_time = now_ms()
         if current_time - last_pixel_toggle > 500:
-            pixel.cycle()
+            hydrapurr.pixel_cycle()
             last_pixel_toggle = current_time
 
         # --- Get the active cat --------------------------------------
@@ -77,10 +75,19 @@ def main_loop(clear_log=True, level=DEBUG):
             if previous_bout_count != bout_count:
                 previous_bout_count = bout_count
                 bout_changed = True
-            
-        
+
+
+        deployment_bout_count = Settings.deployment_bout_count
+        bout_count = counter.get_bout_count()
+        if bout_count >= deployment_bout_count:
+            info(f'Deployment bout count {deployment_bout_count} reached, for {current_cat}')
+            hydrapurr.feeder_on()
+            time.sleep(Settings.deployment_duration_ms/1000)
+            hydrapurr.feeder_on()
+            counter.reset_counts()
+            bout_changed = True
+
         # --- Update screen --------------------------------------
-        
         if cat_changed or bout_changed:
             bout_count = counter.get_bout_count()
             line0 = current_cat

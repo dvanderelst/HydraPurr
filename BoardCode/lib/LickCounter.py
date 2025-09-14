@@ -1,5 +1,6 @@
 import time
 from components.MyStore import MyStore
+import Settings
 
 def now(): return int(time.monotonic() * 1000)  # int ms for consistency
 
@@ -14,11 +15,11 @@ class LickState:
         self.candidate_since = None
         self.last_lick_end_ms = None
         # Parameters
-        self.debounce_ms = 5
-        self.min_lick_ms = 50
-        self.max_lick_ms = 150
-        self.min_licks_per_bout = 3
-        self.max_bout_gap_ms = 1000
+        self.debounce_ms = 5 # Let's keep this fixed for now
+        self.min_lick_ms = Settings.min_lick_ms
+        self.max_lick_ms = Settings.max_lick_ms
+        self.min_licks_per_bout = Settings.min_licks_per_bout
+        self.max_bout_gap_ms = Settings.max_bout_gap_ms
 
     def process_sample(self, sample):
         current_time = now()
@@ -90,6 +91,10 @@ class LickState:
 
         return lick_finalized, lick_duration, bout_closed
 
+    def reset_counts(self, reset_licks=True, reset_bouts=True):
+        if reset_licks: self.lick_count = 0
+        if reset_bouts: self.bout_count = 0
+
 class LickCounter:
     def __init__(self, cat_names=None, clear_log=False, file_name="licks.csv"):
         if cat_names is None: cat_names = ['unknown']
@@ -154,6 +159,12 @@ class LickCounter:
         if cat_name is None: cat_name = self.active_cat_name
         s = self.states.get(cat_name)
         return [cat_name, s.state, s.lick_count, s.bout_count]
+
+    def reset_counts(self, cat_name=None):
+        if cat_name is None: cat_name = self.active_cat_name
+        s = self.states.get(cat_name)
+        s.reset_counts()
+        self.log_data(cat_name=cat_name)
 
     def log_data(self, cat_name=None):
         if cat_name is None: cat_name = self.active_cat_name
