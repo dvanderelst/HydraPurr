@@ -19,6 +19,16 @@ HOLD_MS = 3000  # presence window after last RFID hit
 LOCK_RELEASE_MS = 2000  # require quiet gap before switching cats
 # ----------------------------------------
 
+# A small helper to update the screen
+def update_screen(hp,ctr, current_cat):
+    bout_count = ctr.get_bout_count()
+    line0 = current_cat
+    line1 = f'[B] {bout_count}'
+    hp.write_line(0, line0)
+    hp.write_line(1, line1)
+    hp.show_screen()
+
+
 def main_loop(clear_log=True, level=DEBUG):
     # Set up logging as first oder of business
     setup(filename="system.log", autosync=True)
@@ -82,6 +92,9 @@ def main_loop(clear_log=True, level=DEBUG):
         deployment_bout_count = Settings.deployment_bout_count
         bout_count = counter.get_bout_count()
         if bout_count >= deployment_bout_count:
+            # update before feeding to make sure user sees the count reached
+            update_screen(hydrapurr, counter, current_cat)
+            
             info(f'Deployment bout count {deployment_bout_count} reached, for {current_cat}')
             hydrapurr.feeder_on()
             time.sleep(Settings.deployment_duration_ms/1000)
@@ -90,15 +103,8 @@ def main_loop(clear_log=True, level=DEBUG):
             bout_changed = True
 
         # --- Update screen --------------------------------------
-        if cat_changed or bout_changed:
-            bout_count = counter.get_bout_count()
-            line0 = current_cat
-            line1 = f'[B] {bout_count}'
-            
-            hydrapurr.write_line(0, line0)
-            hydrapurr.write_line(1, line1)
-            hydrapurr.show_screen()
-            
+        if cat_changed or bout_changed: update_screen(hydrapurr,counter, current_cat)
+
             
 
 
