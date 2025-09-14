@@ -3,7 +3,7 @@ import MainLoop
 from components.MySystemLog import DEBUG, INFO, WARN, ERROR
 
 print('Running...')
-tests_to_run = [8]
+tests_to_run = []
 # Select which tests to run (same numbering as the old script)
 # 0 -> blinking indicator LED
 # 1 -> switching relay

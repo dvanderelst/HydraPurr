@@ -1,23 +1,27 @@
-# TagReader.py — cooperative, scheduled-reset RFID reader (WL-134 on RP2040)
+# TagReader.py — WL-134 RFID reader for RP2040
 # - Non-blocking poll() (no sleeps)
-# - Periodic reset via tiny state machine (~3 Hz)
+# - Rate limiter: MAX_READ_HZ -> refresh_ms (returns cached value inside window)
+# - cache_on_fail=False (hardcoded)
+# - reset_on_success=True (hardcoded)
+# - Periodic reset (~3 Hz) via tiny state machine + reset-on-success
 # - STX/ETX framing, XOR checksum, optional invert check
-# - 26-char ASCII-hex parser → BE/LE ints + tag_key
-# - De-dup of repeats within repeat_ms window
+# - Robust 26-char ASCII-hex parser (BE/LE ints) + tag_key
+# - De-dup repeats within repeat_ms
+# - Sticky helpers: active_tag(timeout_ms), poll_active(timeout_ms)
 
 import time, board, busio
 from components import MyDigital
-from components.MySystemLog import debug, info, warn, error
+from components.MySystemLog import debug, warn, error
+
+MAX_READ_HZ = 3.0  # change here to adjust read refresh limit (Hz)
 
 def parser_hex_len26(body: bytes):
-    """Parse a 26-character ASCII-hex payload → dict with BE/LE ints and tag_key."""
     try: up = body.decode("ascii").strip().upper()
     except Exception: return None
     if len(up)!=26 or any(c not in "0123456789ABCDEF" for c in up): return None
     try: id_int_be = int(up, 16)
     except Exception: id_int_be = None
-    pairs = [up[i:i+2] for i in range(0, 26, 2)]
-    rev_hex = "".join(reversed(pairs))
+    pairs = [up[i:i+2] for i in range(0, 26, 2)]; rev_hex = "".join(reversed(pairs))
     try: id_int_le = int(rev_hex, 16)
     except Exception: id_int_le = None
     return {"tag": up, "id_int_be": id_int_be, "id_int_le": id_int_le, "tag_key": up}
@@ -39,6 +43,13 @@ class TagReader:
         self.period_ms = int(1000/self.force_reset_hz) if self.force_reset_hz>0 else 0
         t0 = self.now_ms(); self.next_reset_ms = (t0+self.period_ms) if self.period_ms else 0
         self.rst_state, self.rst_until_ms = "idle", 0
+        # --- Read-rate limiter & cache ---------------------------------------
+        self.refresh_ms = int(1000/MAX_READ_HZ) if MAX_READ_HZ>0 else 0
+        self.last_attempt_ms, self.last_pkt = 0, None
+        self.cache_on_fail = False        # hardcoded
+        self.reset_on_success = True      # hardcoded
+        # --- Sticky (last successful) ----------------------------------------
+        self.last_success_pkt, self.last_success_ms = None, 0
         # --- Buffer -----------------------------------------------------------
         self.buf = bytearray()
 
@@ -56,7 +67,8 @@ class TagReader:
             debug("[RFID] reset: settled"); return
 
     def reset_now(self):
-        if self.rst_state=="idle" and self.period_ms: self.next_reset_ms=self.now_ms(); self.tick_reset(self.now_ms())
+        if self.rst_state=="idle":
+            now=self.now_ms(); self.next_reset_ms=now; self.tick_reset(now)
 
     # ---- UART ingest --------------------------------------------------------
     def read_buf(self):
@@ -67,13 +79,12 @@ class TagReader:
         self.buf.extend(chunk); debug(f"[RFID] read {len(chunk)}B → buf={len(self.buf)}B")
         if len(self.buf)>2*self.max_len: self.buf=self.buf[-self.max_len:]
 
-    # ---- Byte scanners (avoid .find() type quirks on Micro/CircuitPython) ---
+    # ---- Manual byte scan (avoid .find() quirks) ----------------------------
     def _find_byte(self, b, start=0, stop=None):
-        """Return index of first occurrence of byte value b (int 0..255) or -1."""
         if not isinstance(b, int): b = b[0]
         n = len(self.buf) if stop is None else min(stop, len(self.buf))
         for k in range(start, n):
-            if self.buf[k] == b: return k
+            if self.buf[k]==b: return k
         return -1
 
     # ---- Framing & validation -----------------------------------------------
@@ -104,31 +115,59 @@ class TagReader:
         if key==self.last_tag and (now-self.last_ms)<self.repeat_ms: return False
         self.last_tag,self.last_ms=key,now; return True
 
+    def _reset_after_success(self, now):
+        if not self.reset_on_success: return
+        if self.rst_state=="idle": self.next_reset_ms=now; self.tick_reset(now)
+        else: self.next_reset_ms=now
+
     # ---- Public API ---------------------------------------------------------
     def poll(self):
-        now=self.now_ms(); self.tick_reset(now); self.read_buf()
+        now=self.now_ms()
+        # --- Rate limiter
+        if self.refresh_ms and (now - self.last_attempt_ms) < self.refresh_ms:
+            return self.last_pkt
+        self.last_attempt_ms = now
+
+        self.tick_reset(now); self.read_buf()
         i=self._find_byte(self.stx)
         if i<0:
             if len(self.buf)>self.max_len: self.buf=self.buf[-self.max_len:]
-            return None
+            self.last_pkt=None; return None
         if (len(self.buf)-i)>self.max_len:
             warn(f"[RFID] overrun: STX at {i}, tail={len(self.buf)-i} > max_len={self.max_len} → resync")
-            self.buf = bytearray(self.buf[i+1:]); return None
+            self.buf = bytearray(self.buf[i+1:]); self.last_pkt=None; return None
         j=self._find_byte(self.etx, i+1, i+self.max_len)
-        if j<0: return None
+        if j<0: self.last_pkt=None; return None
+
         frame=bytes(self.buf[i:j+1]); self.buf = bytearray(self.buf[j+1:])
         body=self.validate_frame(frame)
-        if body is None: return None
+        if body is None: self.last_pkt=None; return None
+
         pkt=self.parse_body(body)
-        if pkt is None: return None
+        if pkt is None: self.last_pkt=None; return None
+
         pkt["raw_hex"]=body.hex().upper()
         if "tag_key" not in pkt:
             fk=pkt.get("tag") or pkt.get("id_hex") or pkt.get("id_ascii") or pkt["raw_hex"]
             pkt["tag_key"]=fk if isinstance(fk,str) else str(fk)
+        if not isinstance(pkt["tag_key"],str): pkt["tag_key"]=str(pkt["tag_key"])
         pkt["time_ms"]=now
-        key=pkt.get("tag_key")
-        if not key: return None
-        if not isinstance(key,str): key=str(key)
-        pkt["tag_key"]=key
-        if not self.deduplicate(key): debug(f"[RFID] duplicate suppressed: {key}"); return None
-        debug(f"[RFID] tag: {key}"); return pkt
+
+        key=pkt["tag_key"]
+        if not key: self.last_pkt=None; return None
+        if not self.deduplicate(key): debug(f"[RFID] duplicate suppressed: {key}"); self.last_pkt=None; return None
+
+        debug(f"[RFID] tag: {key}")
+        self.last_pkt = pkt
+        self.last_success_pkt, self.last_success_ms = pkt, now
+        self._reset_after_success(now)
+        return pkt
+
+    # ---- Sticky helpers -----------------------------------------------------
+    def active_tag(self, timeout_ms):
+        now=self.now_ms()
+        return self.last_success_pkt if (self.last_success_pkt and (now - self.last_success_ms) < timeout_ms) else None
+
+    def poll_active(self, timeout_ms):
+        _ = self.poll()  # may update last_success_* if we got a fresh read
+        return self.active_tag(timeout_ms)
