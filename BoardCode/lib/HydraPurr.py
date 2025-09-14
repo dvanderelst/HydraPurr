@@ -6,10 +6,8 @@ from components import MyADC
 from components import MyBT
 from components import MyStore
 from components import MyRTC
-from components import MyRFID
 
 from components.MySystemLog import debug, info, warn, error
-from components.MySystemLog import clear_system_log
 from components.MyStore import print_directory
 
 class HydraPurr:
@@ -32,23 +30,14 @@ class HydraPurr:
         self.stores = {}
         # Defines the RTC for timekeeping
         self.rtc = MyRTC()
-        # Defines the RFID reader
-        self.rfid_reader = MyRFID()
-        # Set up logging for this class
         debug("[HydraPurr] HydraPurr initialized")
-
-    # --- clear system log ---
-    @staticmethod
-    def clear_system_log(): # alias for ease
-        clear_system_log()
-        debug("[HydraPurr] System Log cleared")
 
     # --- read lick ---
     def read_lick(self, binary=True):
         lick_value = self.lick.read()
         lick_threshold = self.lick_threshold
         if binary: lick_value = 1 if lick_value < lick_threshold else 0
-        debug(f'[HydraPurr] Lick value: {lick_value}, binary: {binary}')
+        #debug(f'[HydraPurr] Lick value: {lick_value}, binary: {binary}')
         return lick_value
 
     # --- indicator LED control ---
@@ -78,9 +67,17 @@ class HydraPurr:
         debug('[HydraPurr] Feeder toggle')
 
     # --- screen ---
-    def screen_write(self, text, x=0, y=0, scale=None, clear=True):
-        self.screen.write(text, x, y, scale=scale, clear=clear)
+    def write(self, text, x=0, y=0):
+        self.screen.write(str(text), x, y)
         debug(f'[HydraPurr] Screen write: {text}')
+    
+    def write_line(self, line_nr, text):
+        self.screen.write_line(line_nr, str(text))
+        debug(f'[HydraPurr] Line write: {text}')
+        
+    def clear_screen(self):
+        self.screen.clear()
+        debug(f'[HydraPurr] Cleared screen')
 
     # --- water level ---
     def read_water_level(self, samples=50, dt=0.001):
@@ -101,14 +98,6 @@ class HydraPurr:
 
     def get_time(self, as_string=False):
         return self.rtc.get_time(as_string=as_string, with_seconds=True)
-
-    # --- read rfid ---
-    def read_rfid(self):
-        data_package = self.rfid_reader.read_data_package()
-        if data_package:
-            interpreted_data = self.rfid_reader.interpret_data_package(data_package)
-            return interpreted_data
-        return None
 
     # --- data logging ---
     def create_data_log(self, filename): #alias for ease

@@ -42,8 +42,22 @@ def set_level(level):
     global _level
     _level = int(level)
 
+def get_level():
+    return _level
+
+def set_mirror_to_console(flag):
+    global _mirror_to_console
+    _mirror_to_console = bool(flag)
+
+def set_mem_max(n):
+    global _mem_max
+    try:
+        _mem_max = int(n)
+    except:
+        pass
+
 def _fmt(level_name, msg):
-    return f"[{_ts()}] {level_name}: {msg}"
+    return f"[{_ts()}] {level_name}:{msg}"
 
 def _emit(line):
     global _mem_buf
@@ -60,31 +74,70 @@ def _emit(line):
     except:
         pass
 
-def debug(msg):
+# joiner that behaves like print(*parts)
+_def_join = lambda parts: " ".join(str(p) for p in parts)
+
+# ---- public logging API (varargs) ----
+
+def debug(*parts):
     if _level <= DEBUG:
-        _emit(_fmt("DEBUG\t", str(msg)))
+        _emit(_fmt("DEBUG ", _def_join(parts)))
 
-def info(msg):
+def info(*parts):
     if _level <= INFO:
-        _emit(_fmt("INFO\t", str(msg)))
+        _emit(_fmt("INFO  ", _def_join(parts)))
 
-def warn(msg):
+def warn(*parts):
     if _level <= WARN:
-        _emit(_fmt("WARN\t", str(msg)))
+        _emit(_fmt("WARN  ", _def_join(parts)))
 
-def error(msg):
+def error(*parts):
     if _level <= ERROR:
-        _emit(_fmt("ERROR\t", str(msg)))
+        _emit(_fmt("ERROR ", _def_join(parts)))
 
-def critical(msg):
+def critical(*parts):
+    msg = _def_join(parts)
     error(msg)
     raise RuntimeError(msg)
+
+# Optional printf-style helpers
+
+def infof(fmt, *args):
+    try:
+        info(fmt % args)
+    except Exception:
+        info(fmt, *args)
+
+def debugf(fmt, *args):
+    try:
+        debug(fmt % args)
+    except Exception:
+        debug(fmt, *args)
+
+def warnf(fmt, *args):
+    try:
+        warn(fmt % args)
+    except Exception:
+        warn(fmt, *args)
+
+def errorf(fmt, *args):
+    try:
+        error(fmt % args)
+    except Exception:
+        error(fmt, *args)
 
 # ---------------- sinks ----------------
 
 class _PrintSink:
     def __call__(self, line):
         print(line)
+
+    def flush(self):
+        try:
+            import sys
+            sys.stdout.flush()
+        except:
+            pass
 
 class _SDSink:
     def __init__(self, path="/sd/system.log", autosync=False, keep_open=True):
@@ -147,27 +200,57 @@ class _SDSink:
             pass
         self._fh = None
 
+class _TeeSink:
+    def __init__(self, *sinks):
+        self.sinks = list(sinks)
+    def __call__(self, line):
+        for s in self.sinks:
+            try:
+                s(line)
+            except:
+                pass
+    def flush(self):
+        for s in self.sinks:
+            if hasattr(s, "flush"):
+                try:
+                    s.flush()
+                except:
+                    pass
+    def close(self):
+        for s in self.sinks:
+            if hasattr(s, "close"):
+                try:
+                    s.close()
+                except:
+                    pass
+
 # ---------------- setup / teardown ----------------
 
-def setup(filename="system.log", autosync=True, keep_open=True):
+def setup(filename="system.log", autosync=True, keep_open=True, quiet=False):
     """Initialize logging. Returns True if logging to SD, else False (console-only)."""
     global _sink, _sd_ok, _log_path
     from components.MyStore import mount_sd
     _sd_ok = bool(mount_sd())
-    if _sd_ok:
+
+    # Determine path (absolute vs relative to mount point)
+    if filename.startswith("/"):
+        path = filename
+    else:
         path = f"{_mount_point.rstrip('/')}/{filename}"
+
+    if _sd_ok:
         _log_path = path
         try:
             sd_sink = _SDSink(path, autosync=autosync, keep_open=keep_open)
             if _mirror_to_console:
-                ps = _PrintSink()
-                _sink = lambda line, a=sd_sink, b=ps: (a(line), b(line))  # tee to SD + console
+                _sink = _TeeSink(sd_sink, _PrintSink())
             else:
                 _sink = sd_sink
-            info(f"[MySystemLog] Logging to SD: {path}")
+            if not quiet: info("[MySystemLog] Logging to SD:", path)
             return True
         except Exception as e:
             print("[MySystemLog] SD sink init failed:", repr(e))
+
     # fallback to console
     _log_path = None
     _sink = _PrintSink()
@@ -178,7 +261,6 @@ def flush():
     """Force a flush to SD if possible."""
     try:
         obj = _sink
-        # If _sink is our tee lambda, we can't reach inner sinks; rely on autosync.
         if hasattr(obj, "flush"):
             obj.flush()
     except:
@@ -210,11 +292,10 @@ def clear_system_log():
     except:
         pass
     try:
-        with open(_log_path, "w") as f:
-            f.write("")
-        print("[MySystemLog] System log cleared")
+        with open(_log_path, "w") as f: f.write("")
         # re-setup with same filename
-        setup(_log_path.split("/")[-1], autosync=True, keep_open=True)
+        setup(_log_path.split("/")[-1], autosync=True, keep_open=True, quiet=True)
+        info("[MySystemLog] System log cleared")
         return True
     except Exception as e:
         print("[MySystemLog] Clear failed:", repr(e))
@@ -279,3 +360,4 @@ def get_memory_log(last_n=None):
 
 def sd_available():
     return _sd_ok
+

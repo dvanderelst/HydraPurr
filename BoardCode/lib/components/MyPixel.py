@@ -35,6 +35,17 @@ class MyPixel:
             auto_write=auto_write
         )
         self._brightness = brightness
+        self.toggle_colors = []
+        self.color_index = 0
+    
+    def cycle(self, brightness=None):
+        nr_colors = len(self.toggle_colors)
+        if nr_colors == 0: return
+        color = self.toggle_colors[self.color_index]
+        self.set_color(color, brightness)
+        self.color_index = self.color_index + 1
+        if self.color_index == nr_colors: self.color_index = 0
+        
 
     def set_color(self, color_name, brightness=None):
         """
@@ -106,49 +117,4 @@ class MyPixel:
         """
         import time
         
-        for _ in range(times):
-            self.set_color(color_name)
-            time.sleep(duration)
-            self.turn_off()
-            time.sleep(duration)
-
-    def rainbow_cycle(self, cycles=5, delay=0.05):
-        """
-        Create a rainbow cycle effect.
-        
-        :param cycles: Number of rainbow cycles (default: 5)
-        :param delay: Delay between color changes (default: 0.05)
-        """
-        import time
-        
-        for _ in range(cycles):
-            for j in range(255):
-                self.pixels.fill(self._wheel(j & 255))
-                time.sleep(delay)
-        
-        self.turn_off()
-
-    def _wheel(self, pos):
-        """
-        Generate color wheel for rainbow effect.
-        
-        :param pos: Position on the color wheel (0-255)
-        :return: RGB color tuple
-        """
-        if pos < 85:
-            return (pos * 3, 255 - pos * 3, 0)
-        elif pos < 170:
-            pos -= 85
-            return (255 - pos * 3, 0, pos * 3)
-        else:
-            pos -= 170
-            return (0, pos * 3, 255 - pos * 3)
-
-    def __str__(self):
-        """
-        String representation of the NeoPixel controller.
-        
-        :return: Current color and brightness information
-        """
-        current_color = self.pixels[0]
-        return f"NeoPixel: Color RGB{current_color}, Brightness: {self._brightness}"
+      
