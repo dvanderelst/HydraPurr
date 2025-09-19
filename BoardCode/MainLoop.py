@@ -94,7 +94,7 @@ def main_loop(clear_log=True, level=DEBUG):
         if bout_count >= deployment_bout_count:
             # update before feeding to make sure user sees the count reached
             update_screen(hydrapurr, counter, current_cat)
-            
+
             info(f'Deployment bout count {deployment_bout_count} reached, for {current_cat}')
             hydrapurr.feeder_on()
             time.sleep(Settings.deployment_duration_ms/1000)
