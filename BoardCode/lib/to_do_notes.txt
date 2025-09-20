@@ -1,2 +1,0 @@
-+ I still have to test and add systemlog code to MyStore. I don't have an SD card now.
-+ I also have to test and add Systemlog to MyRFID, after I fix the wiring issue.

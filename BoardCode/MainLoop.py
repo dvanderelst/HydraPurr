@@ -12,13 +12,6 @@ from HydraPurr import HydraPurr
 
 def now_ms(): return int(time.monotonic() * 1000)
 
-# ---------------- config ----------------
-TAG_REQUIRED = True  # gatekeeper mode; False = logger mode
-ALLOW_UNKNOWN = False  # allow unknown tags to open gate
-HOLD_MS = 3000  # presence window after last RFID hit
-LOCK_RELEASE_MS = 2000  # require quiet gap before switching cats
-# ----------------------------------------
-
 # A small helper to update the screen
 def update_screen(hp,ctr, current_cat):
     bout_count = ctr.get_bout_count()
@@ -29,8 +22,9 @@ def update_screen(hp,ctr, current_cat):
     hp.show_screen()
 
 
-def main_loop(clear_log=True, level=DEBUG):
+def main_loop(clear_log=None, level=DEBUG):
     # Set up logging as first oder of business
+    if clear_log == None: clear_log = Settings.clear_log_on_start
     setup(filename="system.log", autosync=True)
     if clear_log: clear_system_log()
     set_level(level)
