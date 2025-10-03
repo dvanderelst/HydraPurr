@@ -45,6 +45,7 @@ def main(selected_tests, clear_log=True):
                 hp.clear_screen()
                 hp.write_line(0, 'Line')
                 hp.write_line(1, 'Writing')
+                hp.show_screen()
                 test_log(2, "Done")
 
             elif test == 3:
