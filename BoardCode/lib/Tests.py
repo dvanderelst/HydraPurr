@@ -1,5 +1,5 @@
 import time
-import sys
+import traceback
 from HydraPurr import HydraPurr
 from TagReader import TagReader
 from components.MySystemLog import setup_system_log, set_system_log_level, DEBUG, info
@@ -104,7 +104,6 @@ def main(selected_tests):
 
             elif test == 7:
                 # RTC set/get
-                info("Test 7: Setting RTC (keep date, set minute to 30, seconds to 0), then read.")
                 test_log(7, "Setting RTC")
                 # Partial set: only update some fields (HydraPurr handles keeping others)  :contentReference[oaicite:3]{index=3}
                 hp.set_time(mn=30, sc=0)
@@ -128,11 +127,8 @@ def main(selected_tests):
 
         except Exception as e:
             info(f"[ERROR] Test {test} raised: {e}")
-            sys.print_exception(e)
+            traceback.print_exception(e)
         time.sleep(2)
     log = read_log()
     return hp, log
 
-# if __name__ == "__main__":
-#     hp = main()
-#     tail_to_console()

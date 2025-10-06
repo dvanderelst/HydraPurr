@@ -14,7 +14,7 @@ if clear_system_log: delete_file(system_log_filename)
 if clear_lick_data: delete_file(lick_data_filename)
 
 print('Running...')
-tests_to_run = [7]
+tests_to_run = []
 # # Select which tests to run (same numbering as the old script)
 # # 0 -> blinking indicator LED
 # # 1 -> switching relay
