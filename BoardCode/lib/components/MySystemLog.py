@@ -1,5 +1,6 @@
 # lib/components/MySystemLog.py
 # Minimal logger: prefer SD (/sd), else console. Requires components.MyStore.mount_sd()
+import Settings
 
 DEBUG = 10
 INFO  = 20
@@ -31,13 +32,34 @@ def _ts():
             return _time_fn()
         except:
             pass
+    # Fallback: show seconds since boot (approx)
     try:
         import supervisor
         return f"{int(supervisor.ticks_ms()/1000)}s"
     except:
         return "0s"
 
-def set_level(level):
+# ---- CSV/legacy formatting controls + monotonic helper ----
+_csv_lines = True  # If True: "rtc,mono_ms,LEVEL,msg"; else legacy "[rtc] LEVEL: msg"
+
+def set_csv_lines(flag):
+    """If True, lines are 'rtc,mono_ms,LEVEL,msg'. If False, keep bracket style."""
+    global _csv_lines
+    _csv_lines = bool(flag)
+
+def _mono_ms():
+    """Monotonic milliseconds since boot (fallbacks if time.monotonic not available)."""
+    try:
+        import time as _time
+        return int(_time.monotonic() * 1000)
+    except:
+        try:
+            import supervisor
+            return int(supervisor.ticks_ms())
+        except:
+            return 0
+
+def set_system_log_level(level):
     """Set minimum level to emit: DEBUG, INFO, WARN, ERROR."""
     global _level
     _level = int(level)
@@ -57,7 +79,14 @@ def set_mem_max(n):
         pass
 
 def _fmt(level_name, msg):
-    return f"[{_ts()}] {level_name}: {msg}"
+    # Normalize level text and choose format
+    lvl = (level_name or "").strip()
+    if _csv_lines:
+        # CSV-style with RTC + monotonic (ms)
+        return f"{_ts()},{_mono_ms()},{lvl},{msg}"
+    else:
+        # Legacy bracketed style
+        return f"[{_ts()}] {lvl}: {msg}"
 
 def _emit(line):
     global _mem_buf
@@ -81,19 +110,19 @@ _def_join = lambda parts: " ".join(str(p) for p in parts)
 
 def debug(*parts):
     if _level <= DEBUG:
-        _emit(_fmt("DEBUG ", _def_join(parts)))
+        _emit(_fmt("DEBUG", _def_join(parts)))
 
 def info(*parts):
     if _level <= INFO:
-        _emit(_fmt("INFO  ", _def_join(parts)))
+        _emit(_fmt("INFO", _def_join(parts)))
 
 def warn(*parts):
     if _level <= WARN:
-        _emit(_fmt("WARN  ", _def_join(parts)))
+        _emit(_fmt("WARN", _def_join(parts)))
 
 def error(*parts):
     if _level <= ERROR:
-        _emit(_fmt("ERROR ", _def_join(parts)))
+        _emit(_fmt("ERROR", _def_join(parts)))
 
 def critical(*parts):
     msg = _def_join(parts)
@@ -226,8 +255,9 @@ class _TeeSink:
 
 # ---------------- setup / teardown ----------------
 
-def setup(filename="system.log", autosync=True, keep_open=True, quiet=False):
+def setup_system_log(autosync=True, keep_open=True, quiet=False):
     """Initialize logging. Returns True if logging to SD, else False (console-only)."""
+    filename = Settings.system_log_filename
     global _sink, _sd_ok, _log_path
     from components.MyStore import mount_sd
     _sd_ok = bool(mount_sd())
@@ -246,7 +276,8 @@ def setup(filename="system.log", autosync=True, keep_open=True, quiet=False):
                 _sink = _TeeSink(sd_sink, _PrintSink())
             else:
                 _sink = sd_sink
-            if not quiet: info("[MySystemLog] Logging to SD:", path)
+            if not quiet:
+                info("[MySystemLog] Logging to SD:", path)
             return True
         except Exception as e:
             print("[MySystemLog] SD sink init failed:", repr(e))
@@ -292,9 +323,10 @@ def clear_system_log():
     except:
         pass
     try:
-        with open(_log_path, "w") as f: f.write("")
+        with open(_log_path, "w") as f:
+            f.write("")
         # re-setup with same filename
-        setup(_log_path.split("/")[-1], autosync=True, keep_open=True, quiet=True)
+        setup_system_log(_log_path.split("/")[-1], autosync=True, keep_open=True, quiet=True)
         info("[MySystemLog] System log cleared")
         return True
     except Exception as e:
@@ -360,4 +392,3 @@ def get_memory_log(last_n=None):
 
 def sd_available():
     return _sd_ok
-

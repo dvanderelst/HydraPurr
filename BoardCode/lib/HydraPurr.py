@@ -1,5 +1,6 @@
 import board
 
+import Settings
 from components import MyDigital
 from components import MyOLED
 from components import MyADC
@@ -7,9 +8,8 @@ from components import MyBT
 from components import MyStore
 from components import MyRTC
 from components import MyPixel
-
 from components.MySystemLog import debug, info, warn, error
-from components.MyStore import print_directory
+
 
 class HydraPurr:
     def __init__(self):
@@ -98,7 +98,24 @@ class HydraPurr:
     def bluetooth_send(self, message):
         message = str(message)
         self.bluetooth.send(message)
-        debug(f'[HydraPurr] Bluetooth send: {message}')
+        debug(f'[HydraPurr] Bluetooth sent: {message}')
+
+    def bluetooth_poll(self):
+        message = self.bluetooth.poll()
+        if message is not None: debug(f'[HydraPurr] Bluetooth received: {message}')
+        return message
+
+    def bluetooth_send_data(self, kind):
+        filename = None
+        if kind == 'lick': filename = Settings.lick_data_filename
+        if kind == 'system': filename = Settings.system_log_filename
+        if filename is None: return
+        selected_storage = self.select_data_log(filename)
+        iteration = selected_storage.iter_lines()
+        for line in iteration:
+            message = ','.join([str(x) for x in line])
+            self.bluetooth.send(message)
+        debug(f'[HydraPurr] Bluetooth sent {kind} data')
 
     # --- RTC time ---
     def set_time(self, yr=None, mt=None, dy=None, hr=None, mn=None, sc=None):
@@ -115,11 +132,11 @@ class HydraPurr:
 
     def pixel_set_color(self, color_name, brightness=None):
         self.pixel.set_color(color_name, brightness)
-        debug(f'[HydraPurr] Pixel set color: {color_name} with brightness {brightness}')
+        #debug(f'[HydraPurr] Pixel set color: {color_name} with brightness {brightness}')
 
     def heartbeat(self, base_color='blue'):
         self.pixel.heartbeat(base_color)
-        debug(f'[HydraPurr] Pixel heartbeat with base color: {base_color}')
+        #debug(f'[HydraPurr] Pixel heartbeat with base color: {base_color}')
 
     # --- data logging ---
     def create_data_log(self, filename): #alias for ease
@@ -145,9 +162,6 @@ class HydraPurr:
         selected_storage.empty()
         return selected_storage
 
-    @staticmethod
-    def print_directory(): # alias for ease
-        print_directory('/sd')
-        
+
         
         
