@@ -51,10 +51,6 @@ def main_loop(clear_log=None, level=DEBUG):
         bout_changed = False
         
         current_time = now_ms()
-        # if current_time - last_pixel_toggle > 500:
-        #     hydrapurr.pixel_cycle()
-        #     last_pixel_toggle = current_time
-
         hydrapurr.heartbeat()
 
         # --- Get the active cat --------------------------------------
@@ -92,7 +88,7 @@ def main_loop(clear_log=None, level=DEBUG):
             info(f'Deployment bout count {deployment_bout_count} reached, for {current_cat}')
             hydrapurr.feeder_on()
             time.sleep(Settings.deployment_duration_ms/1000)
-            hydrapurr.feeder_on()
+            hydrapurr.feeder_off()
             counter.reset_counts()
             bout_changed = True
 
