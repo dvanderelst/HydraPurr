@@ -1,6 +1,7 @@
-# MyStore.py
-import os, time as _time, board, sdcardio, storage
+# lib/components/MyStore.py
+import os, time as _time, board  # sdcardio/storage no longer needed here
 from components.MyRTC import MyRTC
+from components import MySD  # ← NEW: centralize SD ops
 
 # ---------------------------------------------------------------------
 # Global variables and constants
@@ -13,9 +14,8 @@ rtc = None            # shared RTC instance
 t0_mono = None        # baseline monotonic at init
 timebase_ready = False
 
-
 # ---------------------------------------------------------------------
-# Filesystem utilities
+# Filesystem utilities (path helpers remain local)
 # ---------------------------------------------------------------------
 def ensure_dir(path):
     try:
@@ -23,43 +23,21 @@ def ensure_dir(path):
     except OSError:
         pass
 
-
 def ensure_dir_recursive(path):
     if not path or path == '/': return
     parts = path.strip('/').split('/')
     cur = ''
     for p in parts:
         cur = (cur + '/' + p) if cur else '/' + p
-        try:
-            os.mkdir(cur)
-        except OSError:
-            pass
-
+        try: os.mkdir(cur)
+        except OSError: pass
 
 def mount_sd():
-    """Mount the SD card under /sd."""
+    """Compat wrapper to the new SD module; preserves old API."""
     global sd_is_mounted
-    if sd_is_mounted:
-        return True
-    try:
-        storage.getmount(mount_point)
-        sd_is_mounted = True
-        return True
-    except Exception:
-        pass
-    ensure_dir(mount_point)
-    try:
-        spi = board.SPI()
-        cs = board.D10
-        sdcard = sdcardio.SDCard(spi, cs)
-        vfs = storage.VfsFat(sdcard)
-        storage.mount(vfs, mount_point)
-        sd_is_mounted = True
-        return True
-    except Exception as e:
-        print(f"Warning: Failed to mount SD card: {e}")
-        return False
-
+    ok = bool(MySD.mount_sd_card())
+    sd_is_mounted = ok
+    return ok
 
 def normalize_to_sd(name):
     if not name:
@@ -71,7 +49,6 @@ def normalize_to_sd(name):
         n = n[1:]
     return mount_point + '/' + n
 
-
 def file_exists(path):
     try:
         with open(path, 'r'):
@@ -79,147 +56,111 @@ def file_exists(path):
     except OSError:
         return False
 
-
 def file_empty(path):
     try:
         return os.stat(path)[6] == 0
     except OSError:
         return True
 
-
 def create_file(path):
-    parent = '/'.join(path.split('/')[:-1])
-    if parent and parent != '/':
-        ensure_dir_recursive(parent)
-    try:
-        with open(path, 'w'):
-            return True
-    except OSError as e:
-        print(f"Warning: Unable to create file. {e}")
+    if not MySD.is_mounted():
+        print("Warning: SD not mounted; create_file skipped")
         return False
-
+    parent = '/'.join(path.split('/')[:-1])
+    if parent and parent != '/': ensure_dir_recursive(parent)
+    try:
+        with open(path, 'w'): return True
+    except OSError as e:
+        print(f"Warning: Unable to create file. {e}"); return False
 
 def write_line(path, line):
-    try:
-        with open(path, 'a') as f:
-            f.write(str(line) + '\n')
-        return True
-    except OSError as e:
-        print(f"Warning: Unable to write line. {e}")
+    if not MySD.is_mounted():
+        print("Warning: SD not mounted; write_line skipped")
         return False
-
+    try:
+        with open(path, 'a') as f: f.write(str(line) + '\n'); return True
+    except OSError as e:
+        print(f"Warning: Unable to write line. {e}"); return False
 
 def write_list(path, lst):
-    try:
-        with open(path, 'a') as f:
-            f.write(separator.join(map(str, lst)) + '\n')
-        return True
-    except OSError as e:
-        print(f"Warning: Unable to write list. {e}")
+    if not MySD.is_mounted():
+        print("Warning: SD not mounted; write_list skipped")
         return False
-
+    try:
+        with open(path, 'a') as f: f.write(separator.join(map(str, lst)) + '\n'); return True
+    except OSError as e:
+        print(f"Warning: Unable to write list. {e}"); return False
 
 def read_lines(path, split=True):
+    if not MySD.is_mounted():
+        print("Warning: SD not mounted; read_lines skipped")
+        return False
     try:
-        with open(path, 'r') as f:
-            lines = [s.rstrip('\n') for s in f.readlines()]
-        if not split:
-            return lines
+        with open(path, 'r') as f: lines = [s.rstrip('\n') for s in f.readlines()]
+        if not split: return lines
         out = []
         for s in lines:
             row = []
             for x in s.split(separator):
-                try:
-                    row.append(float(x))
-                except ValueError:
-                    row.append(x)
+                try: row.append(float(x))
+                except ValueError: row.append(x)
             out.append(row)
         return out
     except OSError as e:
-        print(f"Warning: Unable to read lines. {e}")
-        return False
-
+        print(f"Warning: Unable to read lines. {e}"); return False
 
 def delete_file(name):
-    """Delete a file from the SD card by name (mounts SD if needed)."""
-    mount_sd()  # ensure the SD is mounted
-    path = normalize_to_sd(name)
-    try:
-        os.remove(path)
-        print(f"Deleted: {path}")
-        return True
-    except OSError as e:
-        print(f"Warning: Unable to delete {path}: {e}")
-        return False
-
+    """Delete a file via the new SD module."""
+    return bool(MySD.delete(name))
 
 def print_directory(path=mount_point, tabs=0):
-    """Pretty-print a directory tree (sizes are approximate)."""
-    try:
-        entries = os.listdir(path)
-    except OSError as e:
-        print(f"Unable to list {path}: {e}")
+    if not MySD.is_mounted():
+        print("Warning: SD not mounted; print_directory skipped")
         return
+    try: entries = os.listdir(path)
+    except OSError as e:
+        print(f"Unable to list {path}: {e}"); return
     for name in entries:
-        if name == "?":
-            continue
+        if name == "?": continue
         full = path + "/" + name
-        try:
-            st = os.stat(full)
-        except OSError:
-            continue
-        isdir = bool(st[0] & 0x4000)
-        size = st[6]
-        if isdir:
-            sizestr = "<DIR>"
-        elif size < 1000:
-            sizestr = f"{size} bytes"
-        elif size < 1_000_000:
-            sizestr = f"{size/1000:.1f} KB"
-        else:
-            sizestr = f"{size/1_000_000:.1f} MB"
+        try: st = os.stat(full)
+        except OSError: continue
+        isdir = bool(st[0] & 0x4000); size = st[6]
+        if isdir: sizestr = "<DIR>"
+        elif size < 1000: sizestr = f"{size} bytes"
+        elif size < 1_000_000: sizestr = f"{size/1000:.1f} KB"
+        else: sizestr = f"{size/1_000_000:.1f} MB"
         print(f'{"   "*tabs}{name + ("/" if isdir else ""):<40} Size: {sizestr:>10}')
-        if isdir:
-            print_directory(full, tabs + 1)
-
+        if isdir: print_directory(full, tabs + 1)
 
 # ---------------------------------------------------------------------
 # Time handling
 # ---------------------------------------------------------------------
 def init_timebase():
-    """Initialize shared RTC and monotonic baseline."""
     global rtc, t0_mono, timebase_ready
-    if timebase_ready:
-        return True
+    if timebase_ready: return True
     rtc = rtc or MyRTC()
     t0_mono = _time.monotonic()
     timebase_ready = True
     return True
 
-
 def timestamp(fmt='iso', with_ms=True):
-    """Hybrid timestamp: RTC for wall time + monotonic for sub-second precision."""
-    if not timebase_ready:
-        init_timebase()
+    if not timebase_ready: init_timebase()
     t = rtc.now()
     if fmt == 'iso':
         base = f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
     elif fmt == 'dt':
-        days = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+        days = ("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday")
         base = f"{days[t.tm_wday]} {t.tm_mday}/{t.tm_mon}/{t.tm_year} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
     elif fmt == 'epoch':
-        try:
-            base = str(int(_time.mktime(t)))
-        except Exception:
-            base = f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
+        try: base = str(int(_time.mktime(t)))
+        except Exception: base = f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
     else:
         base = f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
-
     if with_ms:
         frac_ms = int((_time.monotonic() - t0_mono) * 1000) % 1000
         return f"{base}.{frac_ms:03d}"
     return base
-
 
 # ---------------------------------------------------------------------
 # MyStore class
@@ -231,34 +172,35 @@ class MyStore:
         mount_sd()
         self.file_name = filename
         self.file_path = normalize_to_sd(filename)
-        self.fmt = fmt
-        self.with_ms = with_ms
-        if not file_exists(self.file_path):
-            create_file(self.file_path)
-        if auto_header:
-            self.header(auto_header, label=time_label)
+        self.fmt = fmt; self.with_ms = with_ms
+        if MySD.is_mounted() and not file_exists(self.file_path): create_file(self.file_path)
+        if auto_header: self.header(auto_header, label=time_label)
 
     def empty(self):
+        if not MySD.is_mounted(): return False
         return create_file(self.file_path)
 
     def header(self, cols, label="time"):
-        if cols is None:
-            return
-        if not file_empty(self.file_path):
-            return
-        row = ([label] + list(cols)) if isinstance(cols, (list, tuple)) else [label, str(cols)]
+        if cols is None or not MySD.is_mounted(): return
+        if not file_empty(self.file_path): return
+        row = ([label] + list(cols)) if isinstance(cols, (list,tuple)) else [label, str(cols)]
         return write_list(self.file_path, row)
 
     def add(self, data):
+        if not MySD.is_mounted(): return False
         ts = timestamp(self.fmt, self.with_ms)
-        row = list(data) if isinstance(data, (list, tuple)) else [data]
+        row = list(data) if isinstance(data, (list,tuple)) else [data]
         return write_list(self.file_path, [ts] + row)
 
     def read(self, split=True):
+        if not MySD.is_mounted(): return False
         return read_lines(self.file_path, split=split)
 
     def iter_lines(self, split=True):
-        """Yield one line at a time (optionally split into values)."""
+        """Yield one line at a time (optionally split)."""
+        if not MySD.is_mounted():
+            print("Warning: SD not mounted; iter_lines skipped")
+            return
         try:
             with open(self.file_path, 'r') as f:
                 for line in f:
@@ -268,10 +210,8 @@ class MyStore:
                     else:
                         parts = []
                         for x in line.split(separator):
-                            try:
-                                parts.append(float(x))
-                            except ValueError:
-                                parts.append(x)
+                            try: parts.append(float(x))
+                            except ValueError: parts.append(x)
                         yield parts
         except OSError as e:
             print(f"Warning: Unable to iterate lines. {e}")

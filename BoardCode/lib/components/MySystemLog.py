@@ -1,6 +1,7 @@
 # lib/components/MySystemLog.py
-# Minimal logger: prefer SD (/sd), else console. Requires components.MyStore.mount_sd()
+# Minimal logger: prefer SD (/sd), else console. Uses components.MySD for mounting.
 import Settings
+from components import MySD  # ← NEW
 
 DEBUG = 10
 INFO  = 20
@@ -183,12 +184,9 @@ class _SDSink:
                     try:
                         self._fh.flush()
                         import os
-                        try:
-                            os.sync()
-                        except:
-                            pass
-                    except:
-                        pass
+                        try: os.sync()
+                        except: pass
+                    except: pass
             else:
                 with open(self.path, "a") as f:
                     f.write(line + "\n")
@@ -196,37 +194,28 @@ class _SDSink:
                         try:
                             f.flush()
                             import os
-                            try:
-                                os.sync()
-                            except:
-                                pass
-                        except:
-                            pass
+                            try: os.sync()
+                            except: pass
+                        except: pass
         except Exception as e:
-            try:
-                print("[MySystemLog] SD write failed:", repr(e))
-            except:
-                pass
+            try: print("[MySystemLog] SD write failed:", repr(e))
+            except: pass
 
     def flush(self):
         if self.keep_open and self._fh:
             try:
                 self._fh.flush()
                 import os
-                try:
-                    os.sync()
-                except:
-                    pass
-            except:
-                pass
+                try: os.sync()
+                except: pass
+            except: pass
 
     def close(self):
         try:
             if self._fh:
                 self._fh.flush()
                 self._fh.close()
-        except:
-            pass
+        except: pass
         self._fh = None
 
 class _TeeSink:
@@ -234,24 +223,18 @@ class _TeeSink:
         self.sinks = list(sinks)
     def __call__(self, line):
         for s in self.sinks:
-            try:
-                s(line)
-            except:
-                pass
+            try: s(line)
+            except: pass
     def flush(self):
         for s in self.sinks:
             if hasattr(s, "flush"):
-                try:
-                    s.flush()
-                except:
-                    pass
+                try: s.flush()
+                except: pass
     def close(self):
         for s in self.sinks:
             if hasattr(s, "close"):
-                try:
-                    s.close()
-                except:
-                    pass
+                try: s.close()
+                except: pass
 
 # ---------------- setup / teardown ----------------
 
@@ -259,8 +242,9 @@ def setup_system_log(autosync=True, keep_open=True, quiet=False):
     """Initialize logging. Returns True if logging to SD, else False (console-only)."""
     filename = Settings.system_log_filename
     global _sink, _sd_ok, _log_path
-    from components.MyStore import mount_sd
-    _sd_ok = bool(mount_sd())
+
+    # Use the new SD module
+    _sd_ok = bool(MySD.mount_sd_card())
 
     # Determine path (absolute vs relative to mount point)
     if filename.startswith("/"):
@@ -268,16 +252,12 @@ def setup_system_log(autosync=True, keep_open=True, quiet=False):
     else:
         path = f"{_mount_point.rstrip('/')}/{filename}"
 
-    if _sd_ok:
+    if _sd_ok and MySD.is_mounted():
         _log_path = path
         try:
             sd_sink = _SDSink(path, autosync=autosync, keep_open=keep_open)
-            if _mirror_to_console:
-                _sink = _TeeSink(sd_sink, _PrintSink())
-            else:
-                _sink = sd_sink
-            if not quiet:
-                info("[MySystemLog] Logging to SD:", path)
+            _sink = _TeeSink(sd_sink, _PrintSink()) if _mirror_to_console else sd_sink
+            if not quiet: info("[MySystemLog] Logging to SD:", path)
             return True
         except Exception as e:
             print("[MySystemLog] SD sink init failed:", repr(e))
@@ -292,40 +272,31 @@ def flush():
     """Force a flush to SD if possible."""
     try:
         obj = _sink
-        if hasattr(obj, "flush"):
-            obj.flush()
-    except:
-        pass
+        if hasattr(obj, "flush"): obj.flush()
+    except: pass
 
 def teardown():
     """Close SD sink (if open)."""
     global _sink
     try:
         obj = _sink
-        if hasattr(obj, "close"):
-            obj.close()
-    except:
-        pass
+        if hasattr(obj, "close"): obj.close()
+    except: pass
 
 # ---------------- utilities: clear / read / tail / snapshot ----------------
 
 def clear_system_log():
     """Erase the system log file if using SD; recreate sink after clearing."""
     global _sink, _sd_ok, _log_path
-    if not _sd_ok or not _log_path:
+    if not (_sd_ok and _log_path and MySD.is_mounted()):
         print("[MySystemLog] No SD log to clear")
         return False
-    # best effort: close file handle before truncating
     try:
         obj = _sink
-        if hasattr(obj, "close"):
-            obj.close()
-    except:
-        pass
+        if hasattr(obj, "close"): obj.close()
+    except: pass
     try:
-        with open(_log_path, "w") as f:
-            f.write("")
-        # re-setup with same filename
+        with open(_log_path, "w") as f: f.write("")
         setup_system_log(_log_path.split("/")[-1], autosync=True, keep_open=True, quiet=True)
         info("[MySystemLog] System log cleared")
         return True
@@ -334,19 +305,13 @@ def clear_system_log():
         return False
 
 def _resolve_path(default_name="system.log"):
-    if _log_path:
-        return _log_path
+    if _log_path: return _log_path
     return f"{_mount_point.rstrip('/')}/{default_name}"
 
 def read_log(last_n=None):
-    """
-    Return log lines as list[str]. If last_n is set, return only the last N lines.
-    Falls back to the in-memory buffer if file not accessible.
-    """
-    try:
-        flush()
-    except:
-        pass
+    """Return log lines as list[str]. Falls back to memory if file not accessible."""
+    try: flush()
+    except: pass
     path = _resolve_path()
     try:
         with open(path, "r") as f:
@@ -356,34 +321,25 @@ def read_log(last_n=None):
         return _mem_buf[-last_n:] if (last_n and last_n > 0) else list(_mem_buf)
 
 def tail(n=100):
-    """Shorthand for last N lines."""
     return read_log(last_n=n)
 
 def tail_to_console(n=100, prefix="> "):
-    """Print the last N lines to console immediately."""
     lines = tail(n)
     for ln in lines:
-        try:
-            print(prefix + ln)
-        except:
-            pass
+        try: print(prefix + ln)
+        except: pass
     return len(lines)
 
 def snapshot_log(to_path=None, last_n=None):
-    """
-    Write a snapshot of the log to a file (default: /sd/system.snapshot.log).
-    Returns number of lines written. Uses memory buffer if SD not available.
-    """
+    """Write a snapshot of the log to a file (default: /sd/system.snapshot.log)."""
     lines = read_log(last_n=last_n)
     if to_path is None:
         to_path = f"{_mount_point.rstrip('/')}/system.snapshot.log"
     try:
         with open(to_path, "w") as f:
-            for ln in lines:
-                f.write(ln + "\n")
+            for ln in lines: f.write(ln + "\n")
         return len(lines)
     except Exception:
-        # couldn't write snapshot; still return how many lines we had
         return len(lines)
 
 def get_memory_log(last_n=None):
@@ -391,4 +347,4 @@ def get_memory_log(last_n=None):
     return _mem_buf[-last_n:] if (last_n and last_n > 0) else list(_mem_buf)
 
 def sd_available():
-    return _sd_ok
+    return _sd_ok and MySD.is_mounted()

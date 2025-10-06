@@ -1,5 +1,6 @@
 from adafruit_other import adafruit_ssd1306
 from adafruit_other import adafruit_framebuf
+from components.MyI2C import common_i2c
 import board
 import busio
 
@@ -23,12 +24,7 @@ class MyOLED:
         self.line_clear_on_write = True
         self.auto_show           = True
         self.clear_on_write      = True   # write(x,y) clears entire screen first
-
-        # I2C / display
-        scl = board.D13
-        sda = board.D12
-        i2c = busio.I2C(scl, sda)
-
+        i2c = common_i2c
         # NOTE: use the driver directly; it already provides .fill, .pixel, .text, .show
         self.oled = adafruit_ssd1306.SSD1306_I2C(self.width, self.height, i2c)
 

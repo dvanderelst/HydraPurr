@@ -2,17 +2,18 @@ import time, board
 import busio
 import adafruit_pcf8523
 from components.MySystemLog import debug, info, warn, error
+from components.MyI2C import common_i2c
 
-i2c_singleton = None
+#i2c_singleton = None
 
-def get_i2c():
-    global i2c_singleton
-    if i2c_singleton is None: i2c_singleton = busio.I2C(board.SCL, board.SDA)
-    return i2c_singleton
+# def get_i2c():
+#     global i2c_singleton
+#     if i2c_singleton is None: i2c_singleton = busio.I2C(board.SCL, board.SDA)
+#     return i2c_singleton
 
 class MyRTC:
-    def __init__(self, i2c=None):
-        self.i2c = i2c or get_i2c()
+    def __init__(self):
+        self.i2c = common_i2c
         self.rtc = adafruit_pcf8523.PCF8523(self.i2c)
     # ---- reads ----
     def now(self):

@@ -41,9 +41,6 @@ def main(selected_tests):
 
             elif test == 2:
                 test_log(2, "Writing to the screen")
-                for x in range(4):
-                    hp.write(str(x), x=5, y=0)
-                    time.sleep(0.5)
                 hp.clear_screen()
                 hp.write_line(0, 'Line')
                 hp.write_line(1, 'Writing')
@@ -132,3 +129,4 @@ def main(selected_tests):
     log = read_log()
     return hp, log
 
+ 
