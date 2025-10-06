@@ -9,7 +9,7 @@ from components import MyStore
 from components import MyRTC
 from components import MyPixel
 from components.MySystemLog import debug, info, warn, error
-
+import time
 
 class HydraPurr:
     def __init__(self):
@@ -26,7 +26,7 @@ class HydraPurr:
         # Defines the water level sensor
         self.water_level = MyADC(0)
         # Defines the Bluetooth hardware module
-        self.bluetooth = MyBT()
+        self.bluetooth = MyBT(baudrate=9600, add_crlf=True)
         # Defines the lick sensor
         self.lick = MyADC(1)
         self.lick_threshold = 2.0
@@ -108,16 +108,40 @@ class HydraPurr:
         return message
 
     def bluetooth_send_data(self, kind):
+        # pick file
         filename = None
-        if kind == 'lick': filename = Settings.lick_data_filename
-        if kind == 'system': filename = Settings.system_log_filename
+        if kind == "licks": filename = Settings.lick_data_filename
+        if kind == "system": filename = Settings.system_log_filename
+        print(kind, filename)
         if filename is None: return
+
         selected_storage = self.select_data_log(filename)
-        iteration = selected_storage.iter_lines()
-        for line in iteration:
-            message = ','.join([str(x) for x in line])
-            self.bluetooth.send(message)
-        debug(f'[HydraPurr] Bluetooth sent {kind} data')
+        it = selected_storage.iter_lines()
+
+        lines = 0
+        bytes_out = 0
+        bytes_out += self.bluetooth.send(f"START,{kind}")
+
+        for line in it:
+            message = ",".join(str(x) for x in line)  # one CSV line
+            sent = self.bluetooth.send(message)  # add_crlf=True appends \r\n
+            bytes_out += (sent or 0)
+            lines += 1
+            time.sleep(0.002)
+
+            # # every 100 lines, give receiver a chance to say STOP
+            # if (lines % 100) == 0:
+            #     # non-blocking check for inbound command
+            #     cmd = self.bluetooth.poll()
+            #     if cmd and cmd.strip().upper() == "STOP":
+            #         self.bluetooth.send(f"ABORT,{kind},at_line,{lines}")
+            #         debug(f"[HydraPurr] Bluetooth aborted {kind} at line {lines}")
+            #         return
+
+        # Optional: announce end
+        bytes_out += self.bluetooth.send(f"END,{kind},lines,{lines},bytes,{bytes_out}")
+        info(f"[HydraPurr] Bluetooth sent {kind} data: {lines} lines, {bytes_out} bytes")
+        print(f"[HydraPurr] Bluetooth sent {kind} data: {lines} lines, {bytes_out} bytes")
 
     # --- RTC time ---
     def set_time(self, yr=None, mt=None, dy=None, hr=None, mn=None, sc=None):
