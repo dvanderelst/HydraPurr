@@ -15,4 +15,4 @@ tests_to_run = []
 # 7 -> set/get RTC time
 # 8 -> RFID module
 if len(tests_to_run) > 0: hp, log = Tests.main(tests_to_run)
-else: MainLoop.main_loop(level=INFO)
+else: MainLoop.main_loop(level=INFO) 
