@@ -26,7 +26,7 @@ class HydraPurr:
         # Defines the water level sensor
         self.water_level = MyADC(0)
         # Defines the Bluetooth hardware module
-        self.bluetooth = MyBT(baudrate=9600, add_crlf=True)
+        self.bluetooth = MyBT()
         # Defines the lick sensor
         self.lick = MyADC(1)
         self.lick_threshold = 2.0
