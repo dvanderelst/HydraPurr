@@ -22,9 +22,7 @@ class HydraPurr:
         self.screen = MyOLED()
         self.screen.set_rotation(False)
         self.screen.auto_show = False
-        
-        # Defines the water level sensor
-        self.water_level = MyADC(0)
+
         # Defines the Bluetooth hardware module
         self.bluetooth = MyBT()
         # Defines the lick sensor

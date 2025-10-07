@@ -1,5 +1,6 @@
 import time
 from components.MyStore import MyStore
+from components.MyADC import MyADC
 import Settings
 
 def now(): return int(time.monotonic() * 1000)  # int ms for consistency
@@ -102,9 +103,10 @@ class LickCounter:
         if 'unknown' not in cat_names: cat_names.insert(0, 'unknown')
         self.active_cat_name = 'unknown'
         self.cat_names = cat_names
-        self.header = ["cat_name", "state", "lick", "bout"]
+        self.header = ["cat_name", "state", "lick", "bout", 'water']
         self.store = MyStore(file_name, auto_header=self.header)
         self.states = {name: LickState(name) for name in cat_names}
+        self.water_level = MyADC(0)
 
     def set_active_cat(self, cat_name):
         if cat_name == self.active_cat_name: return
@@ -158,7 +160,8 @@ class LickCounter:
     def get_state_data(self, cat_name=None):
         if cat_name is None: cat_name = self.active_cat_name
         s = self.states.get(cat_name)
-        return [cat_name, s.state, s.lick_count, s.bout_count]
+        water_level = self.water_level.mean(10)  # update reading
+        return [cat_name, s.state, s.lick_count, s.bout_count, water_level]
 
     def reset_counts(self, cat_name=None):
         if cat_name is None: cat_name = self.active_cat_name
