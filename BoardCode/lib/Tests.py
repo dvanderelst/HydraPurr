@@ -1,18 +1,20 @@
 import time
-import sys
+import traceback
 from HydraPurr import HydraPurr
 from TagReader import TagReader
-from components.MySystemLog import setup, set_level, DEBUG, info
-from components.MySystemLog import clear_system_log, read_log
+from components.MySystemLog import setup_system_log, set_system_log_level, DEBUG, info
+from components.MySystemLog import read_log
+from components.MySystemLog import set_time_fn
+from components.MyStore import timestamp  # uses your RTC + ms
 
 def test_log(number, message, function=info):
     line = f"[Test {number}] {message}"
     function(line)
 
-def main(selected_tests, clear_log=True):
-    setup(filename="system.log", autosync=True)
-    if clear_log: clear_system_log()
-    set_level(DEBUG)
+def main(selected_tests):
+    set_system_log_level(DEBUG)
+    set_time_fn(lambda: timestamp('iso', True))  # use RTC time for log timestamps
+    setup_system_log()
     info("[Run Tests] Start")
     hp = HydraPurr()
 
@@ -39,9 +41,6 @@ def main(selected_tests, clear_log=True):
 
             elif test == 2:
                 test_log(2, "Writing to the screen")
-                for x in range(4):
-                    hp.write(str(x), x=5, y=0)
-                    time.sleep(0.5)
                 hp.clear_screen()
                 hp.write_line(0, 'Line')
                 hp.write_line(1, 'Writing')
@@ -102,7 +101,6 @@ def main(selected_tests, clear_log=True):
 
             elif test == 7:
                 # RTC set/get
-                info("Test 7: Setting RTC (keep date, set minute to 30, seconds to 0), then read.")
                 test_log(7, "Setting RTC")
                 # Partial set: only update some fields (HydraPurr handles keeping others)  :contentReference[oaicite:3]{index=3}
                 hp.set_time(mn=30, sc=0)
@@ -126,11 +124,9 @@ def main(selected_tests, clear_log=True):
 
         except Exception as e:
             info(f"[ERROR] Test {test} raised: {e}")
-            sys.print_exception(e)
+            traceback.print_exception(e)
         time.sleep(2)
     log = read_log()
     return hp, log
 
-# if __name__ == "__main__":
-#     hp = main()
-#     tail_to_console()
+ 

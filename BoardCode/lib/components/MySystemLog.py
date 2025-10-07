@@ -1,5 +1,7 @@
 # lib/components/MySystemLog.py
-# Minimal logger: prefer SD (/sd), else console. Requires components.MyStore.mount_sd()
+# Minimal logger: prefer SD (/sd), else console. Uses components.MySD for mounting.
+import Settings
+from components import MySD  # ← NEW
 
 DEBUG = 10
 INFO  = 20
@@ -31,13 +33,34 @@ def _ts():
             return _time_fn()
         except:
             pass
+    # Fallback: show seconds since boot (approx)
     try:
         import supervisor
         return f"{int(supervisor.ticks_ms()/1000)}s"
     except:
         return "0s"
 
-def set_level(level):
+# ---- CSV/legacy formatting controls + monotonic helper ----
+_csv_lines = True  # If True: "rtc,mono_ms,LEVEL,msg"; else legacy "[rtc] LEVEL: msg"
+
+def set_csv_lines(flag):
+    """If True, lines are 'rtc,mono_ms,LEVEL,msg'. If False, keep bracket style."""
+    global _csv_lines
+    _csv_lines = bool(flag)
+
+def _mono_ms():
+    """Monotonic milliseconds since boot (fallbacks if time.monotonic not available)."""
+    try:
+        import time as _time
+        return int(_time.monotonic() * 1000)
+    except:
+        try:
+            import supervisor
+            return int(supervisor.ticks_ms())
+        except:
+            return 0
+
+def set_system_log_level(level):
     """Set minimum level to emit: DEBUG, INFO, WARN, ERROR."""
     global _level
     _level = int(level)
@@ -57,7 +80,14 @@ def set_mem_max(n):
         pass
 
 def _fmt(level_name, msg):
-    return f"[{_ts()}] {level_name}: {msg}"
+    # Normalize level text and choose format
+    lvl = (level_name or "").strip()
+    if _csv_lines:
+        # CSV-style with RTC + monotonic (ms)
+        return f"{_ts()},{_mono_ms()},{lvl},{msg}"
+    else:
+        # Legacy bracketed style
+        return f"[{_ts()}] {lvl}: {msg}"
 
 def _emit(line):
     global _mem_buf
@@ -81,19 +111,19 @@ _def_join = lambda parts: " ".join(str(p) for p in parts)
 
 def debug(*parts):
     if _level <= DEBUG:
-        _emit(_fmt("DEBUG ", _def_join(parts)))
+        _emit(_fmt("DEBUG", _def_join(parts)))
 
 def info(*parts):
     if _level <= INFO:
-        _emit(_fmt("INFO  ", _def_join(parts)))
+        _emit(_fmt("INFO", _def_join(parts)))
 
 def warn(*parts):
     if _level <= WARN:
-        _emit(_fmt("WARN  ", _def_join(parts)))
+        _emit(_fmt("WARN", _def_join(parts)))
 
 def error(*parts):
     if _level <= ERROR:
-        _emit(_fmt("ERROR ", _def_join(parts)))
+        _emit(_fmt("ERROR", _def_join(parts)))
 
 def critical(*parts):
     msg = _def_join(parts)
@@ -154,12 +184,9 @@ class _SDSink:
                     try:
                         self._fh.flush()
                         import os
-                        try:
-                            os.sync()
-                        except:
-                            pass
-                    except:
-                        pass
+                        try: os.sync()
+                        except: pass
+                    except: pass
             else:
                 with open(self.path, "a") as f:
                     f.write(line + "\n")
@@ -167,37 +194,28 @@ class _SDSink:
                         try:
                             f.flush()
                             import os
-                            try:
-                                os.sync()
-                            except:
-                                pass
-                        except:
-                            pass
+                            try: os.sync()
+                            except: pass
+                        except: pass
         except Exception as e:
-            try:
-                print("[MySystemLog] SD write failed:", repr(e))
-            except:
-                pass
+            try: print("[MySystemLog] SD write failed:", repr(e))
+            except: pass
 
     def flush(self):
         if self.keep_open and self._fh:
             try:
                 self._fh.flush()
                 import os
-                try:
-                    os.sync()
-                except:
-                    pass
-            except:
-                pass
+                try: os.sync()
+                except: pass
+            except: pass
 
     def close(self):
         try:
             if self._fh:
                 self._fh.flush()
                 self._fh.close()
-        except:
-            pass
+        except: pass
         self._fh = None
 
 class _TeeSink:
@@ -205,32 +223,28 @@ class _TeeSink:
         self.sinks = list(sinks)
     def __call__(self, line):
         for s in self.sinks:
-            try:
-                s(line)
-            except:
-                pass
+            try: s(line)
+            except: pass
     def flush(self):
         for s in self.sinks:
             if hasattr(s, "flush"):
-                try:
-                    s.flush()
-                except:
-                    pass
+                try: s.flush()
+                except: pass
     def close(self):
         for s in self.sinks:
             if hasattr(s, "close"):
-                try:
-                    s.close()
-                except:
-                    pass
+                try: s.close()
+                except: pass
 
 # ---------------- setup / teardown ----------------
 
-def setup(filename="system.log", autosync=True, keep_open=True, quiet=False):
+def setup_system_log(autosync=True, keep_open=True, quiet=False):
     """Initialize logging. Returns True if logging to SD, else False (console-only)."""
+    filename = Settings.system_log_filename
     global _sink, _sd_ok, _log_path
-    from components.MyStore import mount_sd
-    _sd_ok = bool(mount_sd())
+
+    # Use the new SD module
+    _sd_ok = bool(MySD.mount_sd_card())
 
     # Determine path (absolute vs relative to mount point)
     if filename.startswith("/"):
@@ -238,14 +252,11 @@ def setup(filename="system.log", autosync=True, keep_open=True, quiet=False):
     else:
         path = f"{_mount_point.rstrip('/')}/{filename}"
 
-    if _sd_ok:
+    if _sd_ok and MySD.is_mounted():
         _log_path = path
         try:
             sd_sink = _SDSink(path, autosync=autosync, keep_open=keep_open)
-            if _mirror_to_console:
-                _sink = _TeeSink(sd_sink, _PrintSink())
-            else:
-                _sink = sd_sink
+            _sink = _TeeSink(sd_sink, _PrintSink()) if _mirror_to_console else sd_sink
             if not quiet: info("[MySystemLog] Logging to SD:", path)
             return True
         except Exception as e:
@@ -261,40 +272,32 @@ def flush():
     """Force a flush to SD if possible."""
     try:
         obj = _sink
-        if hasattr(obj, "flush"):
-            obj.flush()
-    except:
-        pass
+        if hasattr(obj, "flush"): obj.flush()
+    except: pass
 
 def teardown():
     """Close SD sink (if open)."""
     global _sink
     try:
         obj = _sink
-        if hasattr(obj, "close"):
-            obj.close()
-    except:
-        pass
+        if hasattr(obj, "close"): obj.close()
+    except: pass
 
 # ---------------- utilities: clear / read / tail / snapshot ----------------
 
 def clear_system_log():
     """Erase the system log file if using SD; recreate sink after clearing."""
     global _sink, _sd_ok, _log_path
-    if not _sd_ok or not _log_path:
+    if not (_sd_ok and _log_path and MySD.is_mounted()):
         print("[MySystemLog] No SD log to clear")
         return False
-    # best effort: close file handle before truncating
     try:
         obj = _sink
-        if hasattr(obj, "close"):
-            obj.close()
-    except:
-        pass
+        if hasattr(obj, "close"): obj.close()
+    except: pass
     try:
         with open(_log_path, "w") as f: f.write("")
-        # re-setup with same filename
-        setup(_log_path.split("/")[-1], autosync=True, keep_open=True, quiet=True)
+        setup_system_log(_log_path.split("/")[-1], autosync=True, keep_open=True, quiet=True)
         info("[MySystemLog] System log cleared")
         return True
     except Exception as e:
@@ -302,19 +305,13 @@ def clear_system_log():
         return False
 
 def _resolve_path(default_name="system.log"):
-    if _log_path:
-        return _log_path
+    if _log_path: return _log_path
     return f"{_mount_point.rstrip('/')}/{default_name}"
 
 def read_log(last_n=None):
-    """
-    Return log lines as list[str]. If last_n is set, return only the last N lines.
-    Falls back to the in-memory buffer if file not accessible.
-    """
-    try:
-        flush()
-    except:
-        pass
+    """Return log lines as list[str]. Falls back to memory if file not accessible."""
+    try: flush()
+    except: pass
     path = _resolve_path()
     try:
         with open(path, "r") as f:
@@ -324,34 +321,25 @@ def read_log(last_n=None):
         return _mem_buf[-last_n:] if (last_n and last_n > 0) else list(_mem_buf)
 
 def tail(n=100):
-    """Shorthand for last N lines."""
     return read_log(last_n=n)
 
 def tail_to_console(n=100, prefix="> "):
-    """Print the last N lines to console immediately."""
     lines = tail(n)
     for ln in lines:
-        try:
-            print(prefix + ln)
-        except:
-            pass
+        try: print(prefix + ln)
+        except: pass
     return len(lines)
 
 def snapshot_log(to_path=None, last_n=None):
-    """
-    Write a snapshot of the log to a file (default: /sd/system.snapshot.log).
-    Returns number of lines written. Uses memory buffer if SD not available.
-    """
+    """Write a snapshot of the log to a file (default: /sd/system.snapshot.log)."""
     lines = read_log(last_n=last_n)
     if to_path is None:
         to_path = f"{_mount_point.rstrip('/')}/system.snapshot.log"
     try:
         with open(to_path, "w") as f:
-            for ln in lines:
-                f.write(ln + "\n")
+            for ln in lines: f.write(ln + "\n")
         return len(lines)
     except Exception:
-        # couldn't write snapshot; still return how many lines we had
         return len(lines)
 
 def get_memory_log(last_n=None):
@@ -359,5 +347,4 @@ def get_memory_log(last_n=None):
     return _mem_buf[-last_n:] if (last_n and last_n > 0) else list(_mem_buf)
 
 def sd_available():
-    return _sd_ok
-
+    return _sd_ok and MySD.is_mounted()

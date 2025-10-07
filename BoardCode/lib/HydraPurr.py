@@ -1,5 +1,6 @@
 import board
 
+import Settings
 from components import MyDigital
 from components import MyOLED
 from components import MyADC
@@ -7,9 +8,8 @@ from components import MyBT
 from components import MyStore
 from components import MyRTC
 from components import MyPixel
-
 from components.MySystemLog import debug, info, warn, error
-from components.MyStore import print_directory
+import time
 
 class HydraPurr:
     def __init__(self):
@@ -18,9 +18,11 @@ class HydraPurr:
         # Defines the relay that controls the feeder
         self.feeder = MyDigital(pin=board.D6, direction='output')
         # Defines the OLED screen
+
         self.screen = MyOLED()
         self.screen.set_rotation(False)
         self.screen.auto_show = False
+        
         # Defines the water level sensor
         self.water_level = MyADC(0)
         # Defines the Bluetooth hardware module
@@ -98,7 +100,48 @@ class HydraPurr:
     def bluetooth_send(self, message):
         message = str(message)
         self.bluetooth.send(message)
-        debug(f'[HydraPurr] Bluetooth send: {message}')
+        debug(f'[HydraPurr] Bluetooth sent: {message}')
+
+    def bluetooth_poll(self):
+        message = self.bluetooth.poll()
+        if message is not None: debug(f'[HydraPurr] Bluetooth received: {message}')
+        return message
+
+    def bluetooth_send_data(self, kind):
+        # pick file
+        filename = None
+        if kind == "licks": filename = Settings.lick_data_filename
+        if kind == "system": filename = Settings.system_log_filename
+        print(kind, filename)
+        if filename is None: return
+
+        selected_storage = self.select_data_log(filename)
+        it = selected_storage.iter_lines()
+
+        lines = 0
+        bytes_out = 0
+        bytes_out += self.bluetooth.send(f"START,{kind}")
+
+        for line in it:
+            message = ",".join(str(x) for x in line)  # one CSV line
+            sent = self.bluetooth.send(message)  # add_crlf=True appends \r\n
+            bytes_out += (sent or 0)
+            lines += 1
+            time.sleep(0.002)
+
+            # # every 100 lines, give receiver a chance to say STOP
+            # if (lines % 100) == 0:
+            #     # non-blocking check for inbound command
+            #     cmd = self.bluetooth.poll()
+            #     if cmd and cmd.strip().upper() == "STOP":
+            #         self.bluetooth.send(f"ABORT,{kind},at_line,{lines}")
+            #         debug(f"[HydraPurr] Bluetooth aborted {kind} at line {lines}")
+            #         return
+
+        # Optional: announce end
+        bytes_out += self.bluetooth.send(f"END,{kind},lines,{lines},bytes,{bytes_out}")
+        info(f"[HydraPurr] Bluetooth sent {kind} data: {lines} lines, {bytes_out} bytes")
+        print(f"[HydraPurr] Bluetooth sent {kind} data: {lines} lines, {bytes_out} bytes")
 
     # --- RTC time ---
     def set_time(self, yr=None, mt=None, dy=None, hr=None, mn=None, sc=None):
@@ -115,11 +158,11 @@ class HydraPurr:
 
     def pixel_set_color(self, color_name, brightness=None):
         self.pixel.set_color(color_name, brightness)
-        debug(f'[HydraPurr] Pixel set color: {color_name} with brightness {brightness}')
+        #debug(f'[HydraPurr] Pixel set color: {color_name} with brightness {brightness}')
 
     def heartbeat(self, base_color='blue'):
         self.pixel.heartbeat(base_color)
-        debug(f'[HydraPurr] Pixel heartbeat with base color: {base_color}')
+        #debug(f'[HydraPurr] Pixel heartbeat with base color: {base_color}')
 
     # --- data logging ---
     def create_data_log(self, filename): #alias for ease
@@ -145,9 +188,6 @@ class HydraPurr:
         selected_storage.empty()
         return selected_storage
 
-    @staticmethod
-    def print_directory(): # alias for ease
-        print_directory('/sd')
-        
+
         
         

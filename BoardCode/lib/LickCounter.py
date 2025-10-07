@@ -96,14 +96,14 @@ class LickState:
         if reset_bouts: self.bout_count = 0
 
 class LickCounter:
-    def __init__(self, cat_names=None, clear_log=False, file_name="licks.csv"):
+    def __init__(self, cat_names=None):
+        file_name= Settings.lick_data_filename
         if cat_names is None: cat_names = ['unknown']
         if 'unknown' not in cat_names: cat_names.insert(0, 'unknown')
         self.active_cat_name = 'unknown'
         self.cat_names = cat_names
-        self.header = ["cat_name", "state", "licks", "bouts"]
-        self.store = MyStore(file_name, fmt='iso', with_ms=True, auto_header=self.header, time_label="time")
-        if clear_log: self.clear_log()
+        self.header = ["cat_name", "state", "lick", "bout"]
+        self.store = MyStore(file_name, auto_header=self.header)
         self.states = {name: LickState(name) for name in cat_names}
 
     def set_active_cat(self, cat_name):

@@ -1,6 +1,9 @@
-# Set this to True to clear to log on each boot.
 
-clear_log_on_start = False
+system_log_filename = "system.log"
+lick_data_filename = "licks.dat"
+
+clear_system_log_on_start = True
+clear_lick_data_on_start = True
 
 cat_timeout_ms = 1000  # switch to 'unknown' if no valid tag is seen for x ms
 max_tag_read_hz = 3.0  # change here to adjust read refresh limit (Hz)

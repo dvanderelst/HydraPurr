@@ -2,8 +2,9 @@ import time
 
 import Cats
 import Settings
-from components.MySystemLog import setup, set_level, DEBUG, INFO, WARN, ERROR
-from components.MySystemLog import clear_system_log
+from components.MySystemLog import setup_system_log, set_system_log_level, DEBUG, INFO, WARN, ERROR
+from components.MySystemLog import set_time_fn
+from components.MyStore import timestamp  # uses your RTC + ms
 from components.MySystemLog import debug, info, warn, error
 
 from LickCounter import LickCounter
@@ -22,36 +23,42 @@ def update_screen(hp,ctr, current_cat):
     hp.show_screen()
 
 
-def main_loop(clear_log=None, level=DEBUG):
-    # Set up logging as first oder of business
-    if clear_log == None: clear_log = Settings.clear_log_on_start
-    setup(filename="system.log", autosync=True)
-    if clear_log: clear_system_log()
-    set_level(level)
-
+def main_loop(level=DEBUG):
     info("[Main Loop] Start")
+    set_system_log_level(level)
+    setup_system_log()
+    set_time_fn(lambda: timestamp('iso', True)) # use RTC time for log timestamps
+    info("[Main Loop] System Log Started")
 
     all_cat_names = Cats.get_all_names()
     info(f'[Main Loop] all defined cats: {all_cat_names}')
     # Hardware / objects
     hydrapurr = HydraPurr()
     reader = TagReader()
-    counter = LickCounter(cat_names=all_cat_names, clear_log=clear_log)
+    counter = LickCounter(cat_names=all_cat_names)
+    info("[Main Loop] Objects created")
 
-    # pixel control
-    last_pixel_toggle = now_ms()
     # Presence/attribution state
     previous_lick_state_string = None
     previous_active_cat = None  # no cat at start
     previous_bout_count = 0
 
+    info("[Main Loop] Starting monitoring loop")
     while True:
         cat_changed = False
         state_changed = False
         bout_changed = False
         
-        current_time = now_ms()
+        #current_time = now_ms()
         hydrapurr.heartbeat()
+        
+        # --- Check for data requests
+        command = hydrapurr.bluetooth_poll()
+        if command is not None:
+            info(f'Processing command: {command}')
+            if command == 'licks': hydrapurr.bluetooth_send_data(kind='licks')
+            if command == 'system': hydrapurr.bluetooth_send_data(kind='system')
+            info(f'Processed command: {command}')
 
         # --- Get the active cat --------------------------------------
         pkt = reader.poll_active()
