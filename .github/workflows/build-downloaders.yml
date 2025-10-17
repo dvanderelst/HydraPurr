@@ -16,7 +16,6 @@ jobs:
 
     defaults:
       run:
-        # We build from the subfolder that holds your script + library
         working-directory: BluetoothDownloader
 
     steps:
@@ -34,7 +33,7 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      # Pick the correct --add-data separator for the OS
+      # ---- Build per-OS ----
       - name: Build (Windows)
         if: runner.os == 'Windows'
         run: >
@@ -57,9 +56,46 @@ jobs:
           --hidden-import serial.tools.list_ports
           Downloader.py
 
+      # ---- Add double-click launchers ----
+      - name: Create double-click launcher (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cat > dist/Downloader.command << 'EOF'
+          #!/bin/sh
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          open -a Terminal "$DIR/Downloader"
+          EOF
+          chmod +x dist/Downloader.command
+
+      - name: Create double-click launcher (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          echo @echo off> dist\Downloader.bat
+          echo set DIR=%%~dp0>> dist\Downloader.bat
+          echo start cmd /k "%%DIR%%Downloader.exe">> dist\Downloader.bat
+
+      - name: Create double-click launcher (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cat > dist/Downloader.sh << 'EOF'
+          #!/usr/bin/env bash
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          # Try common terminals; first one found is used
+          for T in "x-terminal-emulator -e" "gnome-terminal --" "konsole -e" "xfce4-terminal -e" "xterm -e"; do
+            BIN=${T%% *}
+            if command -v $BIN >/dev/null 2>&1; then
+              exec $T "$DIR/Downloader"
+            fi
+          done
+          # Fallback: run directly (may not show a terminal window)
+          exec "$DIR/Downloader"
+          EOF
+          chmod +x dist/Downloader.sh
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: Downloader-${{ runner.os }}
-          path: |
-            BluetoothDownloader/dist/**
+          path: BluetoothDownloader/dist/**
+
