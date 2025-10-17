@@ -24,10 +24,10 @@ def update_screen(hp,ctr, current_cat):
 
 
 def main_loop(level=DEBUG):
+    set_time_fn(lambda: timestamp('iso', True))  # use RTC time for log timestamps
     info("[Main Loop] Start")
     set_system_log_level(level)
     setup_system_log()
-    set_time_fn(lambda: timestamp('iso', True)) # use RTC time for log timestamps
     info("[Main Loop] System Log Started")
 
     all_cat_names = Cats.get_all_names()
@@ -55,10 +55,10 @@ def main_loop(level=DEBUG):
         # --- Check for data requests
         command = hydrapurr.bluetooth_poll()
         if command is not None:
-            info(f'Processing command: {command}')
+            info(f'[Main Loop] Processing command: {command}')
             if command == 'licks': hydrapurr.bluetooth_send_data(kind='licks')
             if command == 'system': hydrapurr.bluetooth_send_data(kind='system')
-            info(f'Processed command: {command}')
+            info(f'[Main Loop] Processed command: {command}')
 
         # --- Get the active cat --------------------------------------
         pkt = reader.poll_active()
@@ -68,7 +68,7 @@ def main_loop(level=DEBUG):
         if current_cat != previous_active_cat:
             p = ("%-10s" % str(previous_active_cat))
             c = ("%-10s" % str(current_cat))
-            info(f'Cat switched {p}-> {c}')
+            info(f'[Main Loop] Cat switched {p}-> {c}')
             previous_active_cat = current_cat
             cat_changed = True
         
@@ -78,7 +78,7 @@ def main_loop(level=DEBUG):
         counter.update(lick_state)
         current_lick_state_string = counter.get_state_string()
         if current_lick_state_string != previous_lick_state_string:
-            info(current_lick_state_string)
+            info('[Main Loop] ' + current_lick_state_string)
             previous_lick_state_string = current_lick_state_string
             bout_count = counter.get_bout_count()
             if previous_bout_count != bout_count:
@@ -92,7 +92,7 @@ def main_loop(level=DEBUG):
             # update before feeding to make sure user sees the count reached
             update_screen(hydrapurr, counter, current_cat)
 
-            info(f'Deployment bout count {deployment_bout_count} reached, for {current_cat}')
+            info(f'[Main Loop] Deployment bout count {deployment_bout_count} reached, for {current_cat}')
             hydrapurr.feeder_on()
             time.sleep(Settings.deployment_duration_ms/1000)
             hydrapurr.feeder_off()
