@@ -20,7 +20,7 @@ while True:
         data_aligned = ''
         if kind == 'system': data_aligned = DataUtils.align_system_data(data)
         if kind == 'licks': data_aligned = DataUtils.align_lick_data(data)
-        for line in data_aligned: print(line)
+        #for line in data_aligned: print(line)
     except Exception as e:
         print("Error aligning data:", e)
         for line in data: print(line)

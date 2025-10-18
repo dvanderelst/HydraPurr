@@ -42,6 +42,7 @@ def main_loop(level=DEBUG):
     previous_lick_state_string = None
     previous_active_cat = None  # no cat at start
     previous_bout_count = 0
+    previous_printed_tag = None
 
     info("[Main Loop] Starting monitoring loop")
     while True:
@@ -64,6 +65,11 @@ def main_loop(level=DEBUG):
         pkt = reader.poll_active()
         if pkt is None: pkt = {}
         tag_key = pkt.get("tag_key", None)
+        
+        if tag_key is not None and previous_printed_tag != tag_key:
+            info(f'[Main Loop] Detected key {str(tag_key)}')
+            previous_printed_tag = tag_key
+            
         current_cat = Cats.get_name(tag_key)
         if current_cat != previous_active_cat:
             p = ("%-10s" % str(previous_active_cat))
