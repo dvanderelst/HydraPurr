@@ -17,7 +17,7 @@ max_bout_gap_ms = 1000
 cats={}
 cats['61000000007E30010000000000'] = {'name': 'henk', 'age': 6}
 cats['32E09C0000ED30010000000000'] = {'name': 'bob', 'age': 12}
-#cats['32E09C0000ED30010000000000'] = {'name': 'colonel', 'age': 12}
+cats['879B029A405D30010000000000'] = {'name': 'Handsome', 'age': 8}
 
 
 
