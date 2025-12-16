@@ -136,17 +136,38 @@ def print_directory(path=mount_point, tabs=0):
 # ---------------------------------------------------------------------
 # Time handling
 # ---------------------------------------------------------------------
+# Store the last RTC time we used to detect when seconds change
+_last_rtc_time = None
+
 def init_timebase():
-    global rtc, t0_mono, timebase_ready
+    global rtc, t0_mono, timebase_ready, _last_rtc_time
     if timebase_ready: return True
     rtc = rtc or MyRTC()
     t0_mono = _time.monotonic()
+    _last_rtc_time = rtc.now()
     timebase_ready = True
     return True
 
 def timestamp(fmt='iso', with_ms=True):
+    global _last_rtc_time
+    
     if not timebase_ready: init_timebase()
+    
+    # Get current time from both sources
     t = rtc.now()
+    mono_now = _time.monotonic()
+    
+    # Check if RTC seconds have changed since last call
+    seconds_changed = False
+    if _last_rtc_time is not None:
+        if t.tm_sec != _last_rtc_time.tm_sec:
+            seconds_changed = True
+    _last_rtc_time = t
+    
+    # If seconds changed, reset our monotonic reference to avoid backward milliseconds
+    if seconds_changed:
+        t0_mono = mono_now
+    
     if fmt == 'iso':
         base = f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
     elif fmt == 'dt':
@@ -157,8 +178,18 @@ def timestamp(fmt='iso', with_ms=True):
         except Exception: base = f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
     else:
         base = f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
+    
     if with_ms:
-        frac_ms = int((_time.monotonic() - t0_mono) * 1000) % 1000
+        # Calculate milliseconds since the last RTC second boundary
+        # This ensures milliseconds are always increasing and don't go backward
+        time_since_reset = mono_now - t0_mono
+        # Handle potential monotonic time wrap-around (though unlikely in CircuitPython)
+        if time_since_reset < 0:
+            # If monotonic time wrapped around, reset our reference
+            t0_mono = mono_now
+            frac_ms = 0
+        else:
+            frac_ms = int(time_since_reset * 1000) % 1000
         return f"{base}.{frac_ms:03d}"
     return base
 
