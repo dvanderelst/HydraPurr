@@ -1,6 +1,5 @@
 from serial.tools import list_ports
 import serial
-import time
 
 
 def get_ports(print_ports=True):
@@ -45,6 +44,7 @@ def connect(port, baud_rate=9600, timeout=5):
 
 
 import time, sys
+
 
 def get_data(connection, kind, timeout=1, idle_timeout=0.75, max_time=20, print_every=0.25):
     command = None
@@ -107,4 +107,3 @@ def get_data(connection, kind, timeout=1, idle_timeout=0.75, max_time=20, print_
     except Exception as e:
         print(f"Error during communication: {e}")
         return None
-

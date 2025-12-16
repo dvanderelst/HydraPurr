@@ -1,9 +1,16 @@
 from library import SerialUtils
 from library import DataUtils
 from library import ProgramUtils
+from library import BluetoothUtils
 
-port = SerialUtils.port_selection()
-connection = SerialUtils.connect(port)
+use_serial = False
+
+if use_serial:
+    port = SerialUtils.port_selection()
+    connection = SerialUtils.connect(port)
+else:
+    mac_address = BluetoothUtils.port_selection()
+    connection = BluetoothUtils.connect(mac_address)
 
 while True:
     kind = ProgramUtils.request_kind()
