@@ -49,8 +49,12 @@ def main(selected_tests):
 
             elif test == 3:
                 test_log(3, "Water level reading")
+                # Water level is now handled by LickCounter, not HydraPurr
+                from LickCounter import LickCounter
+                lc = LickCounter(['test'])
                 for i in range(10):
-                    hp.read_water_level(samples=50, dt=0.001)
+                    water_level = lc.water_level.mean(50, 0.001)
+                    test_log(3, f"Water level: {water_level}")
                     time.sleep(1)
                 test_log(3, "Done")
 

@@ -88,11 +88,7 @@ class HydraPurr:
     def show_screen(self):
         self.screen.show()
 
-    # --- water level ---
-    def read_water_level(self, samples=50, dt=0.001):
-        water_value = self.water_level.mean(num_samples=samples, sample_delay=dt)
-        debug(f'[HydraPurr] Water level value: {water_value}')
-        return water_value
+
 
     # --- send bt data ---
     def bluetooth_send(self, message):
