@@ -104,7 +104,7 @@ class LickCounter:
         self.active_cat_name = 'unknown'
         self.cat_names = cat_names
         self.header = ["cat_name", "state", "lick", "bout", 'water']
-        self.store = MyStore(file_name, auto_header=self.header)
+        self.store = MyStore(file_name, auto_header=self.header, max_lines=Settings.data_log_max_lines)
         self.states = {name: LickState(name) for name in cat_names}
         self.water_level = MyADC(0)
 
@@ -121,7 +121,7 @@ class LickCounter:
 
     def clear_log(self):
         self.store.empty()
-        self.store.header(self.header, label="time")
+        self.store.header(self.header, label=self.store.time_label)
 
     def read_data_log(self): return self.store.read()
 

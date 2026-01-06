@@ -37,13 +37,14 @@ def list_data_folders(data_root: str | Path = "data") -> List[DataFolderStatus]:
 
 def print_data_folders_table(data_root: str | Path = "data") -> None:
     rows = list_data_folders(data_root)
+    print('Data Folders:')
     print(f"{'Index':>5}  {'Folder':<30}  Licks  System Log")
     print("-" * 55)
     for idx, row in enumerate(rows):
         licks = "yes" if row.has_licks else "no"
         system = "yes" if row.has_system_log else "no"
         print(f"{idx:>5}  {row.name:<30}  {licks:<5}  {system}")
-
+    print("-" * 55)
 
 @dataclass(frozen=True)
 class DataFolderContents:

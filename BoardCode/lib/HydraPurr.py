@@ -164,7 +164,8 @@ class HydraPurr:
     
     def select_data_log(self, filename):
         exists = filename in self.stores
-        if not exists: self.stores[filename] = MyStore(filename)
+        if not exists:
+            self.stores[filename] = MyStore(filename, max_lines=Settings.data_log_max_lines)
         selected_storage = self.stores[filename]
         return selected_storage
 

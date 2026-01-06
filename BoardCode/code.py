@@ -8,7 +8,7 @@ from components.MySD import quick_self_test, mount_sd_card
 print('Running...')
 
 mount_sd_card()
-quick_self_test()
+# quick_self_test()  # Debug-only
 
 clear_system_log = Settings.clear_system_log_on_start
 clear_lick_data = Settings.clear_lick_data_on_start

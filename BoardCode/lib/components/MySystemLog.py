@@ -2,6 +2,7 @@
 # Minimal logger: prefer SD (/sd), else console. Uses components.MySD for mounting.
 import Settings
 from components import MySD  # ← NEW
+from components import TimeUtil
 
 DEBUG = 10
 INFO  = 20
@@ -10,7 +11,6 @@ ERROR = 40
 
 _level = INFO
 _sink = None
-_time_fn = None
 _sd_ok = False
 _mirror_to_console = True
 _mount_point = "/sd"
@@ -22,43 +22,37 @@ _mem_max = 500  # number of recent lines to keep
 
 # ---------------- basics ----------------
 
-def set_time_fn(fn):
-    """Provide a function that returns a timestamp string (e.g., rtc.get_time(as_string=True))."""
-    global _time_fn
-    _time_fn = fn
+_csv_lines = True  # If True: "time,mono_ms,LEVEL,msg"; else legacy "[time] LEVEL: msg"
 
-def _ts():
-    if _time_fn:
-        try:
-            return _time_fn()
-        except:
-            pass
-    # Fallback: show seconds since boot (approx)
+def _count_lines(path, stop_at=None):
     try:
-        import supervisor
-        return f"{int(supervisor.ticks_ms()/1000)}s"
-    except:
-        return "0s"
+        count = 0
+        with open(path, "r") as f:
+            for _ in f:
+                count += 1
+                if stop_at is not None and count >= stop_at:
+                    break
+        return count
+    except Exception:
+        return 0
 
-# ---- CSV/legacy formatting controls + monotonic helper ----
-_csv_lines = True  # If True: "rtc,mono_ms,LEVEL,msg"; else legacy "[rtc] LEVEL: msg"
+def _next_rotation_path(path, max_tries=10000):
+    try:
+        import os
+        for i in range(1, max_tries + 1):
+            candidate = f"{path}.{i}"
+            try:
+                os.stat(candidate)
+            except OSError:
+                return candidate
+    except Exception:
+        return None
+    return None
 
 def set_csv_lines(flag):
-    """If True, lines are 'rtc,mono_ms,LEVEL,msg'. If False, keep bracket style."""
+    """If True, lines are 'time,mono_ms,LEVEL,msg'. If False, keep bracket style."""
     global _csv_lines
     _csv_lines = bool(flag)
-
-def _mono_ms():
-    """Monotonic milliseconds since boot (fallbacks if time.monotonic not available)."""
-    try:
-        import time as _time
-        return int(_time.monotonic() * 1000)
-    except:
-        try:
-            import supervisor
-            return int(supervisor.ticks_ms())
-        except:
-            return 0
 
 def set_system_log_level(level):
     """Set minimum level to emit: DEBUG, INFO, WARN, ERROR."""
@@ -79,15 +73,24 @@ def set_mem_max(n):
     except:
         pass
 
+def _escape_csv(text):
+    if text is None:
+        return ""
+    s = str(text)
+    if any(c in s for c in [",", "\"", "\n", "\r"]):
+        s = "\"" + s.replace("\"", "\"\"") + "\""
+    return s
+
 def _fmt(level_name, msg):
     # Normalize level text and choose format
     lvl = (level_name or "").strip()
+    ts, mono = TimeUtil.timestamp_pair('iso', True)
     if _csv_lines:
-        # CSV-style with RTC + monotonic (ms)
-        return f"{_ts()},{_mono_ms()},{lvl},{msg}"
+        # CSV-style with monotonic wall time + raw monotonic (ms)
+        return f"{ts},{mono},{_escape_csv(lvl)},{_escape_csv(msg)}"
     else:
         # Legacy bracketed style
-        return f"[{_ts()}] {lvl}: {msg}"
+        return f"[{ts}] {lvl}: {msg}"
 
 def _emit(line):
     global _mem_buf
@@ -170,14 +173,25 @@ class _PrintSink:
             pass
 
 class _SDSink:
-    def __init__(self, path="/sd/system.log", autosync=False, keep_open=True):
+    def __init__(self, path="/sd/system.log", autosync=False, keep_open=True, max_lines=None):
         self.path = path
         self.autosync = autosync
         self.keep_open = keep_open
+        self._max_lines = max_lines
+        self._line_count = 0
         self._fh = open(self.path, "a") if keep_open else None
+        if self._max_lines:
+            total = _count_lines(self.path, stop_at=self._max_lines + 1)
+            self._line_count = total
+            if self._line_count >= self._max_lines:
+                self._rotate_file()
+                self._line_count = 0
 
     def __call__(self, line):
         try:
+            if self._max_lines and self._line_count >= self._max_lines:
+                self._rotate_file()
+                self._line_count = 0
             if self.keep_open:
                 self._fh.write(line + "\n")
                 if self.autosync:
@@ -197,6 +211,8 @@ class _SDSink:
                             try: os.sync()
                             except: pass
                         except: pass
+            if self._max_lines is not None:
+                self._line_count += 1
         except Exception as e:
             try: print("[MySystemLog] SD write failed:", repr(e))
             except: pass
@@ -217,6 +233,29 @@ class _SDSink:
                 self._fh.close()
         except: pass
         self._fh = None
+
+    def _rotate_file(self):
+        try:
+            if self._fh:
+                self._fh.flush()
+                self._fh.close()
+        except:
+            pass
+        rotated = _next_rotation_path(self.path)
+        if rotated is None:
+            try: print("[MySystemLog] No rotation slot available; rotate skipped")
+            except: pass
+            return False
+        try:
+            import os
+            os.rename(self.path, rotated)
+            if self.keep_open:
+                self._fh = open(self.path, "a")
+            return True
+        except Exception as e:
+            try: print("[MySystemLog] rotate failed:", repr(e))
+            except: pass
+            return False
 
 class _TeeSink:
     def __init__(self, *sinks):
@@ -241,6 +280,7 @@ class _TeeSink:
 def setup_system_log(autosync=True, keep_open=True, quiet=False):
     """Initialize logging. Returns True if logging to SD, else False (console-only)."""
     filename = Settings.system_log_filename
+    max_lines = getattr(Settings, "system_log_max_lines", None)
     global _sink, _sd_ok, _log_path
 
     # Use the new SD module
@@ -255,7 +295,7 @@ def setup_system_log(autosync=True, keep_open=True, quiet=False):
     if _sd_ok and MySD.is_mounted():
         _log_path = path
         try:
-            sd_sink = _SDSink(path, autosync=autosync, keep_open=keep_open)
+            sd_sink = _SDSink(path, autosync=autosync, keep_open=keep_open, max_lines=max_lines)
             _sink = _TeeSink(sd_sink, _PrintSink()) if _mirror_to_console else sd_sink
             if not quiet: info("[MySystemLog] Logging to SD:", path)
             return True
@@ -297,7 +337,7 @@ def clear_system_log():
     except: pass
     try:
         with open(_log_path, "w") as f: f.write("")
-        setup_system_log(_log_path.split("/")[-1], autosync=True, keep_open=True, quiet=True)
+        setup_system_log(autosync=True, keep_open=True, quiet=True)
         info("[MySystemLog] System log cleared")
         return True
     except Exception as e:
