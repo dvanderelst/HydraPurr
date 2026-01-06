@@ -24,3 +24,8 @@ def filter_lick_events(contents):
     print('Retained Lines:', retained_lines.shape[0])
     print("-" * 55)
     return retained_lines
+
+def check_time_increases(df):
+    value = df['time'] > df['time'].shift(1)
+    df.insert(loc=1, column='time_increases', value = value)
+    return df
