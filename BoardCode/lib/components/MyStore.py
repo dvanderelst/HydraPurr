@@ -1,7 +1,7 @@
 # lib/components/MyStore.py
-import os, time as _time, board  # sdcardio/storage no longer needed here
-from components.MyRTC import MyRTC
+import os, board  # sdcardio/storage no longer needed here
 from components import MySD  # ← NEW: centralize SD ops
+from components import TimeUtil
 
 # ---------------------------------------------------------------------
 # Global variables and constants
@@ -10,9 +10,7 @@ path_separator = os.sep
 separator = ','
 mount_point = '/sd'
 sd_is_mounted = False
-rtc = None            # shared RTC instance
-t0_mono = None        # baseline monotonic at init
-timebase_ready = False
+time_labels = ["time", "mono_ms"]
 
 # ---------------------------------------------------------------------
 # Filesystem utilities (path helpers remain local)
@@ -136,62 +134,8 @@ def print_directory(path=mount_point, tabs=0):
 # ---------------------------------------------------------------------
 # Time handling
 # ---------------------------------------------------------------------
-# Store the last RTC time we used to detect when seconds change
-_last_rtc_time = None
-
-def init_timebase():
-    global rtc, t0_mono, timebase_ready, _last_rtc_time
-    if timebase_ready: return True
-    rtc = rtc or MyRTC()
-    t0_mono = _time.monotonic()
-    _last_rtc_time = rtc.now()
-    timebase_ready = True
-    return True
-
 def timestamp(fmt='iso', with_ms=True):
-    global _last_rtc_time
-    
-    if not timebase_ready: init_timebase()
-    
-    # Get current time from both sources
-    t = rtc.now()
-    mono_now = _time.monotonic()
-    
-    # Check if RTC seconds have changed since last call
-    seconds_changed = False
-    if _last_rtc_time is not None:
-        if t.tm_sec != _last_rtc_time.tm_sec:
-            seconds_changed = True
-    _last_rtc_time = t
-    
-    # If seconds changed, reset our monotonic reference to avoid backward milliseconds
-    if seconds_changed:
-        t0_mono = mono_now
-    
-    if fmt == 'iso':
-        base = f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
-    elif fmt == 'dt':
-        days = ("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday")
-        base = f"{days[t.tm_wday]} {t.tm_mday}/{t.tm_mon}/{t.tm_year} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
-    elif fmt == 'epoch':
-        try: base = str(int(_time.mktime(t)))
-        except Exception: base = f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
-    else:
-        base = f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
-    
-    if with_ms:
-        # Calculate milliseconds since the last RTC second boundary
-        # This ensures milliseconds are always increasing and don't go backward
-        time_since_reset = mono_now - t0_mono
-        # Handle potential monotonic time wrap-around (though unlikely in CircuitPython)
-        if time_since_reset < 0:
-            # If monotonic time wrapped around, reset our reference
-            t0_mono = mono_now
-            frac_ms = 0
-        else:
-            frac_ms = int(time_since_reset * 1000) % 1000
-        return f"{base}.{frac_ms:03d}"
-    return base
+    return TimeUtil.timestamp(fmt, with_ms)
 
 # ---------------------------------------------------------------------
 # MyStore class
@@ -199,13 +143,14 @@ def timestamp(fmt='iso', with_ms=True):
 class MyStore:
     """Logs time-stamped rows (CSV-like text format) to SD card."""
 
-    def __init__(self, filename, fmt='iso', with_ms=True, auto_header=None, time_label="time"):
+    def __init__(self, filename, fmt='iso', with_ms=True, auto_header=None, time_label=None):
         mount_sd()
         self.file_name = filename
         self.file_path = normalize_to_sd(filename)
         self.fmt = fmt; self.with_ms = with_ms
+        self.time_label = time_label if time_label is not None else list(time_labels)
         if MySD.is_mounted() and not file_exists(self.file_path): create_file(self.file_path)
-        if auto_header: self.header(auto_header, label=time_label)
+        if auto_header: self.header(auto_header, label=self.time_label)
 
     def empty(self):
         if not MySD.is_mounted(): return False
@@ -214,14 +159,18 @@ class MyStore:
     def header(self, cols, label="time"):
         if cols is None or not MySD.is_mounted(): return
         if not file_empty(self.file_path): return
-        row = ([label] + list(cols)) if isinstance(cols, (list,tuple)) else [label, str(cols)]
+        if isinstance(label, (list, tuple)):
+            row = list(label)
+        else:
+            row = [label]
+        row += list(cols) if isinstance(cols, (list, tuple)) else [str(cols)]
         return write_list(self.file_path, row)
 
     def add(self, data):
         if not MySD.is_mounted(): return False
-        ts = timestamp(self.fmt, self.with_ms)
+        ts, mono = TimeUtil.timestamp_pair(self.fmt, self.with_ms)
         row = list(data) if isinstance(data, (list,tuple)) else [data]
-        return write_list(self.file_path, [ts] + row)
+        return write_list(self.file_path, [ts, mono] + row)
 
     def read(self, split=True):
         if not MySD.is_mounted(): return False

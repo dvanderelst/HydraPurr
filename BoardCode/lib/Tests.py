@@ -4,8 +4,6 @@ from HydraPurr import HydraPurr
 from TagReader import TagReader
 from components.MySystemLog import setup_system_log, set_system_log_level, DEBUG, info
 from components.MySystemLog import read_log
-from components.MySystemLog import set_time_fn
-from components.MyStore import timestamp  # uses your RTC + ms
 
 def test_log(number, message, function=info):
     line = f"[Test {number}] {message}"
@@ -13,7 +11,6 @@ def test_log(number, message, function=info):
 
 def main(selected_tests):
     set_system_log_level(DEBUG)
-    set_time_fn(lambda: timestamp('iso', True))  # use RTC time for log timestamps
     setup_system_log()
     info("[Run Tests] Start")
     hp = HydraPurr()

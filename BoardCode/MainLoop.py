@@ -3,8 +3,6 @@ import time
 import Cats
 import Settings
 from components.MySystemLog import setup_system_log, set_system_log_level, DEBUG, INFO, WARN, ERROR
-from components.MySystemLog import set_time_fn
-from components.MyStore import timestamp  # uses your RTC + ms
 from components.MySystemLog import debug, info, warn, error
 
 from LickCounter import LickCounter
@@ -24,7 +22,6 @@ def update_screen(hp,ctr, current_cat):
 
 
 def main_loop(level=DEBUG):
-    set_time_fn(lambda: timestamp('iso', True))  # use RTC time for log timestamps
     info("[Main Loop] Start")
     set_system_log_level(level)
     setup_system_log()
@@ -109,5 +106,3 @@ def main_loop(level=DEBUG):
         if cat_changed or bout_changed: update_screen(hydrapurr,counter, current_cat)
 
             
-
-

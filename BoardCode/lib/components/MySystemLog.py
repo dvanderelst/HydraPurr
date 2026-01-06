@@ -2,6 +2,7 @@
 # Minimal logger: prefer SD (/sd), else console. Uses components.MySD for mounting.
 import Settings
 from components import MySD  # ← NEW
+from components import TimeUtil
 
 DEBUG = 10
 INFO  = 20
@@ -10,7 +11,6 @@ ERROR = 40
 
 _level = INFO
 _sink = None
-_time_fn = None
 _sd_ok = False
 _mirror_to_console = True
 _mount_point = "/sd"
@@ -22,43 +22,12 @@ _mem_max = 500  # number of recent lines to keep
 
 # ---------------- basics ----------------
 
-def set_time_fn(fn):
-    """Provide a function that returns a timestamp string (e.g., rtc.get_time(as_string=True))."""
-    global _time_fn
-    _time_fn = fn
-
-def _ts():
-    if _time_fn:
-        try:
-            return _time_fn()
-        except:
-            pass
-    # Fallback: show seconds since boot (approx)
-    try:
-        import supervisor
-        return f"{int(supervisor.ticks_ms()/1000)}s"
-    except:
-        return "0s"
-
-# ---- CSV/legacy formatting controls + monotonic helper ----
-_csv_lines = True  # If True: "rtc,mono_ms,LEVEL,msg"; else legacy "[rtc] LEVEL: msg"
+_csv_lines = True  # If True: "time,mono_ms,LEVEL,msg"; else legacy "[time] LEVEL: msg"
 
 def set_csv_lines(flag):
-    """If True, lines are 'rtc,mono_ms,LEVEL,msg'. If False, keep bracket style."""
+    """If True, lines are 'time,mono_ms,LEVEL,msg'. If False, keep bracket style."""
     global _csv_lines
     _csv_lines = bool(flag)
-
-def _mono_ms():
-    """Monotonic milliseconds since boot (fallbacks if time.monotonic not available)."""
-    try:
-        import time as _time
-        return int(_time.monotonic() * 1000)
-    except:
-        try:
-            import supervisor
-            return int(supervisor.ticks_ms())
-        except:
-            return 0
 
 def set_system_log_level(level):
     """Set minimum level to emit: DEBUG, INFO, WARN, ERROR."""
@@ -82,12 +51,13 @@ def set_mem_max(n):
 def _fmt(level_name, msg):
     # Normalize level text and choose format
     lvl = (level_name or "").strip()
+    ts, mono = TimeUtil.timestamp_pair('iso', True)
     if _csv_lines:
-        # CSV-style with RTC + monotonic (ms)
-        return f"{_ts()},{_mono_ms()},{lvl},{msg}"
+        # CSV-style with monotonic wall time + raw monotonic (ms)
+        return f"{ts},{mono},{lvl},{msg}"
     else:
         # Legacy bracketed style
-        return f"[{_ts()}] {lvl}: {msg}"
+        return f"[{ts}] {lvl}: {msg}"
 
 def _emit(line):
     global _mem_buf
