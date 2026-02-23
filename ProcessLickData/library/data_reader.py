@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Union
-
+from library import utils
 import pandas as pd
+import natsort
 
 
 @dataclass(frozen=True)
@@ -15,13 +16,19 @@ class DataFolderStatus:
     has_system_log: bool
 
 
+def check_time_increases(df):
+    value = df['time'] > df['time'].shift(1)
+    df.insert(loc=1, column='time_increases', value = value)
+    return df
+
+
 def list_data_folders(data_root: str | Path = "data") -> List[DataFolderStatus]:
     data_root = Path(data_root)
     if not data_root.exists():
         return []
 
     statuses: List[DataFolderStatus] = []
-    for folder in sorted(p for p in data_root.iterdir() if p.is_dir()):
+    for folder in natsort.natsorted(p for p in data_root.iterdir() if p.is_dir()):
         has_licks = (folder / "licks.dat").is_file()
         has_system_log = (folder / "system.log").is_file()
         statuses.append(
@@ -72,11 +79,16 @@ def read_system_log(path: str | Path) -> pd.DataFrame:
             line = line.strip()
             if not line:
                 continue
-            parts = line.split(",", 3)
-            if len(parts) < 4:
+            parts = line.split(",", 4)
+            if len(parts) < 5:
                 continue
-            timestamp, ticks, level, remainder = parts
+            timestamp, mono_ms, ticks, level, remainder = parts
             source = None
+            remainder = remainder.strip()
+            if (remainder.startswith('"') and remainder.endswith('"')) or (
+                remainder.startswith("'") and remainder.endswith("'")
+            ):
+                remainder = remainder[1:-1].strip()
             message = remainder
             if remainder.startswith("[") and "]" in remainder:
                 end = remainder.find("]")
@@ -85,6 +97,7 @@ def read_system_log(path: str | Path) -> pd.DataFrame:
             rows.append(
                 {
                     "time": timestamp,
+                    "mono_ms": mono_ms,
                     "ticks": ticks,
                     "level": level,
                     "source": source,
@@ -96,6 +109,7 @@ def read_system_log(path: str | Path) -> pd.DataFrame:
         data["time"] = pd.to_datetime(
             data["time"], format="%Y-%m-%d %H:%M:%S.%f", errors="coerce"
         )
+        data["mono_ms"] = pd.to_numeric(data["mono_ms"], errors="coerce")
         data["ticks"] = pd.to_numeric(data["ticks"], errors="coerce")
     return data
 
@@ -120,6 +134,7 @@ def read_data_folder(
     licks_path = folder_path / "licks.dat"
     system_log_path = folder_path / "system.log"
     licks = read_licks_file(licks_path) if licks_path.is_file() else None
+    licks = check_time_increases(licks)
     system_log = read_system_log(system_log_path) if system_log_path.is_file() else None
     return DataFolderContents(
         name=folder_path.name,
