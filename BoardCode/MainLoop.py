@@ -76,9 +76,9 @@ def main_loop(level=DEBUG):
             cat_changed = True
         
         # --- Process the lick --------------------------------------
-        lick_state = 1 if hydrapurr.read_lick(binary=True) else 0
+        raw_lick_value = hydrapurr.read_lick(binary=False)
         counter.set_active_cat(current_cat)
-        counter.update(lick_state)
+        counter.update(raw_lick_value)
         current_lick_state_string = counter.get_state_string()
         if current_lick_state_string != previous_lick_state_string:
             info('[Main Loop] ' + current_lick_state_string)
