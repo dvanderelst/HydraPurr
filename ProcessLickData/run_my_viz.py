@@ -22,7 +22,8 @@ analyzer = BoutAnalyzer()
 processed, summary = analyzer.analyze_dataframe(
     licks, 
     group_gap_ms=12000,  # 12-second gap between bouts
-    min_group_size=5     # Minimum 5 licks per bout
+    min_group_size=3,    # Minimum 3 licks per bout (more realistic for this data)
+    min_water_delta=0.0   # No water delta requirement (sensor has low sensitivity)
 )
 print(f"Analysis: {len(processed)} events, {len(summary)} bouts")
 

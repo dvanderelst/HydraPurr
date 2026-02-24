@@ -15,6 +15,12 @@ min_lick_ms = 50
 max_lick_ms = 150
 min_licks_per_bout = 3
 max_bout_gap_ms = 12000
+min_water_delta_per_bout = 0.0  # Minimum water extent (mm) to count a bout (0 = disabled)
+                                # Uses extent = max_water_level - min_water_level during bout
+                                # Positive extent = water level fluctuated during bout
+                                # Larger extent = more water activity (likely consumption)
+                                # Pass bouts with extent > threshold, filter bouts with extent <= threshold
+                                # Set to 0.0 to disable water consumption filtering
 
 cats={}
 cats['61000000007E30010000000000'] = {'name': 'henk', 'age': 6}

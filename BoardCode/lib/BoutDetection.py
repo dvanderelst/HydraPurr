@@ -53,7 +53,8 @@ class BoutTracker:
     """
     
     def __init__(self, cat_name, min_lick_ms=50, max_lick_ms=150,
-                 min_licks_per_bout=3, max_bout_gap_ms=1000, debounce_ms=5):
+                 min_licks_per_bout=3, max_bout_gap_ms=12000, debounce_ms=5,
+                 min_water_delta=0.0):
         """Initialize bout tracker for a specific cat"""
         self.cat_name = cat_name
         
@@ -63,6 +64,7 @@ class BoutTracker:
         self.min_licks_per_bout = min_licks_per_bout
         self.max_bout_gap_ms = max_bout_gap_ms
         self.debounce_ms = debounce_ms
+        self.min_water_delta = min_water_delta
         
         # State tracking
         self.state = 0  # Current debounced state (0 or 1)
@@ -174,6 +176,16 @@ class BoutTracker:
         start_water = self.current_bout_start_water
         end_water_level = end_water if end_water is not None else self.current_bout_licks[-1][1]
         water_delta = end_water_level - start_water if start_water is not None else None
+        
+        # Check minimum water consumption using extent (max - min during bout)
+        # Positive extent means water level fluctuated (consumption causes fluctuation)
+        if self.min_water_delta > 0 and water_extent is not None and water_extent <= self.min_water_delta:
+            # Not enough water level fluctuation, don't count this bout
+            # Note: water_extent = max - min, so larger values indicate more activity/consumption
+            # We want water_extent > min_water_delta to keep the bout
+            # Only filter if min_water_delta > 0 (enabled)
+            self._reset_bout_tracking()
+            return
         
         # Water extent (max - min during bout)
         if self.current_bout_licks and start_water is not None:
@@ -368,7 +380,7 @@ class BoutManager:
         if cat_name in self.trackers:
             self.trackers[cat_name].reset_counts()
     
-    def process_dataframe(self, df, group_gap_ms=None, min_group_size=None):
+    def process_dataframe(self, df, group_gap_ms=None, min_group_size=None, min_water_delta=None):
         """
         Batch process a dataframe of lick data (offline analysis).
         
@@ -376,6 +388,7 @@ class BoutManager:
             df: DataFrame with columns ['time', 'cat_name', 'state', 'water']
             group_gap_ms: Override max_bout_gap_ms for this analysis
             min_group_size: Override min_licks_per_bout for this analysis
+            min_water_delta: Override min_water_delta for this analysis
             
         Returns:
             tuple: (events_df, summary_df)
@@ -387,20 +400,21 @@ class BoutManager:
         tracker = next(iter(self.trackers.values()))
         group_gap_ms = group_gap_ms or tracker.max_bout_gap_ms
         min_group_size = min_group_size or tracker.min_licks_per_bout
+        min_water_delta = min_water_delta or tracker.min_water_delta
         
         # Filter to keep only state transitions
         lick_events = self._filter_lick_events(df)
         
         # Process events
-        results = self._process_lick_events(lick_events, group_gap_ms)
+        results = self._process_lick_events(lick_events, group_gap_ms, min_water_delta)
         results_df = pd.DataFrame(
             results,
             columns=['index', 'time', 'duration', 'water', 'water_delta', 'group']
         )
         
-        # Apply minimum group size filtering
+        # Apply minimum group size and water consumption filtering
         if min_group_size > 1 and not results_df.empty:
-            results_df = self._filter_small_groups(results_df, min_group_size)
+            results_df = self._filter_small_groups(results_df, min_group_size, min_water_delta)
         
         # Add group index
         results_df = self._add_group_indices(results_df)
@@ -416,6 +430,10 @@ class BoutManager:
         previous_state = 0
         
         for _, row in df.iterrows():
+            # Skip rows with NaN values
+            if pd.isna(row['state']) or pd.isna(row['water']):
+                continue
+                
             current_state = int(row['state'])
             if previous_state == 0 and current_state == 1:
                 retained_lines.append(row)
@@ -425,7 +443,7 @@ class BoutManager:
         
         return pd.DataFrame(retained_lines)
     
-    def _process_lick_events(self, lick_events, group_gap_ms):
+    def _process_lick_events(self, lick_events, group_gap_ms, min_water_delta):
         """Process lick events into bouts"""
         results = []
         previous_state = 0
@@ -439,22 +457,39 @@ class BoutManager:
             current_state = int(row['state'])
             
             if previous_state == 0 and current_state == 1:
-                onset_time = row['time']
+                # Use mono_ms for timestamp if available, otherwise fall back to time
+                onset_time = row.get('mono_ms', row['time'])
                 previous_water = row['water']
             
             if previous_state == 1 and current_state == 0:
-                offset_time = row['time']
+                # Use mono_ms for timestamp if available, otherwise fall back to time
+                offset_time = row.get('mono_ms', row['time'])
                 current_water = row['water']
-                duration = (offset_time - onset_time).total_seconds() * 1000
+                
+                # Handle different time formats (datetime or numeric)
+                if hasattr(offset_time, 'total_seconds'):
+                    # datetime object
+                    duration = (offset_time - onset_time).total_seconds() * 1000
+                    if last_offset_time is not None:
+                        gap_ms = (offset_time - last_offset_time).total_seconds() * 1000
+                    else:
+                        gap_ms = None
+                else:
+                    # numeric timestamp (mono_ms)
+                    duration = offset_time - onset_time
+                    if last_offset_time is not None:
+                        gap_ms = offset_time - last_offset_time
+                    else:
+                        gap_ms = None
+                
                 water_delta = current_water - previous_water
                 
                 if last_offset_time is None:
                     group += 1
-                else:
-                    gap_ms = (offset_time - last_offset_time).total_seconds() * 1000
-                    if gap_ms > group_gap_ms:
-                        group += 1
+                elif gap_ms is not None and gap_ms > group_gap_ms:
+                    group += 1
                 
+                # Count all valid licks, we'll check water delta at bout level
                 results.append([count, offset_time, duration, current_water, water_delta, group])
                 last_offset_time = offset_time
                 count += 1
@@ -463,11 +498,26 @@ class BoutManager:
         
         return results
     
-    def _filter_small_groups(self, results_df, min_group_size):
-        """Filter out groups with fewer than min_group_size licks"""
+    def _filter_small_groups(self, results_df, min_group_size, min_water_delta):
+        """Filter out groups with fewer than min_group_size licks or insufficient water consumption"""
+        if results_df.empty:
+            return results_df
+            
+        # First filter by group size
         group_counts = results_df["group"].value_counts()
         small_groups = group_counts[group_counts < min_group_size].index
         results_df.loc[results_df["group"].isin(small_groups), "group"] = np.nan
+        
+        # Then filter by water extent (max - min during bout)
+        # Positive extent means water level fluctuated (consumption causes fluctuation)
+        if min_water_delta > 0:  # Only filter if enabled
+            grouped = results_df.dropna(subset=["group"]).groupby("group")
+            for group_id, group_df in grouped:
+                # Calculate water extent for this bout (max - min water level)
+                water_extent = group_df["water"].max() - group_df["water"].min()
+                # If water extent is not large enough, filter out this group
+                if water_extent <= min_water_delta:  # Not enough fluctuation
+                    results_df.loc[results_df["group"] == group_id, "group"] = np.nan
         
         kept_groups = sorted(results_df["group"].dropna().unique())
         group_map = {group_id: idx for idx, group_id in enumerate(kept_groups)}
@@ -496,7 +546,15 @@ class BoutManager:
                 for group_id, group_df in grouped.groupby("group"):
                     start_time = group_df["time"].iloc[0]
                     end_time = group_df["time"].iloc[-1]
-                    duration_ms = (end_time - start_time).total_seconds() * 1000
+                    
+                    # Handle different time formats (datetime or numeric)
+                    if hasattr(end_time, 'total_seconds'):
+                        # datetime object
+                        duration_ms = (end_time - start_time).total_seconds() * 1000
+                    else:
+                        # numeric timestamp (mono_ms)
+                        duration_ms = end_time - start_time
+                    
                     start_water = group_df["water"].iloc[0]
                     end_water = group_df["water"].iloc[-1]
                     summary_rows.append({

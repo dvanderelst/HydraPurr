@@ -40,17 +40,19 @@ class BoutAnalyzer:
         """
         if settings:
             # Use board settings
+            min_water_delta = getattr(settings, 'min_water_delta_per_bout', 0.1)
             self.bout_manager = BoutManager(
                 min_lick_ms=settings.min_lick_ms,
                 max_lick_ms=settings.max_lick_ms,
                 min_licks_per_bout=settings.min_licks_per_bout,
-                max_bout_gap_ms=settings.max_bout_gap_ms
+                max_bout_gap_ms=settings.max_bout_gap_ms,
+                min_water_delta=min_water_delta
             )
         else:
             # Use defaults
             self.bout_manager = BoutManager()
     
-    def analyze_dataframe(self, df, group_gap_ms=None, min_group_size=None):
+    def analyze_dataframe(self, df, group_gap_ms=None, min_group_size=None, min_water_delta=None):
         """
         Analyze a dataframe of lick data.
         
@@ -58,6 +60,7 @@ class BoutAnalyzer:
             df: DataFrame with columns ['time', 'cat_name', 'state', 'water']
             group_gap_ms: Override max_bout_gap_ms for this analysis
             min_group_size: Override min_licks_per_bout for this analysis
+            min_water_delta: Override min_water_delta for this analysis
             
         Returns:
             tuple: (events_df, summary_df)
@@ -65,7 +68,7 @@ class BoutAnalyzer:
                    summary_df - bout-level statistics
         """
         return self.bout_manager.process_dataframe(
-            df, group_gap_ms=group_gap_ms, min_group_size=min_group_size
+            df, group_gap_ms=group_gap_ms, min_group_size=min_group_size, min_water_delta=min_water_delta
         )
     
     def analyze_data_folder(self, folder_path):

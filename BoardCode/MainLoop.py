@@ -5,7 +5,7 @@ import Settings
 from components.MySystemLog import setup_system_log, set_system_log_level, DEBUG, INFO, WARN, ERROR
 from components.MySystemLog import debug, info, warn, error
 
-from LickCounter import LickCounter
+from LickSensor import LickSensor
 from TagReader import TagReader     # new non-blocking, scheduled-reset version
 from HydraPurr import HydraPurr
 
@@ -32,7 +32,7 @@ def main_loop(level=DEBUG):
     # Hardware / objects
     hydrapurr = HydraPurr()
     reader = TagReader()
-    counter = LickCounter(cat_names=all_cat_names)
+    counter = LickSensor(cat_names=all_cat_names)
     info("[Main Loop] Objects created")
 
     # Presence/attribution state
@@ -91,6 +91,26 @@ def main_loop(level=DEBUG):
 
         deployment_bout_count = Settings.deployment_bout_count
         bout_count = counter.get_bout_count()
+        
+        # Access rich bout information for smarter feeding decisions
+        bout_summary = counter.get_last_bout_summary()
+        if bout_summary is not None:
+            lick_count = bout_summary.get('lick_count', 0)
+            duration_ms = bout_summary.get('duration_ms', 0)
+            water_extent = bout_summary.get('water_extent', 0)
+            water_delta = bout_summary.get('water_delta', 0)
+            
+            info(f'[Main Loop] Last bout: {lick_count} licks, {duration_ms}ms, extent={water_extent:.3f}mm, delta={water_delta:.3f}mm')
+            
+            # Example: Only feed if bout shows significant water consumption
+            # if water_extent > Settings.min_water_delta_per_bout:
+            #     info(f'[Main Loop] Significant consumption detected, feeding {current_cat}')
+            #     hydrapurr.feeder_on()
+            #     time.sleep(Settings.deployment_duration_ms/1000)
+            #     hydrapurr.feeder_off()
+            #     counter.reset_counts()
+            #     bout_changed = True
+        
         if bout_count >= deployment_bout_count:
             # update before feeding to make sure user sees the count reached
             update_screen(hydrapurr, counter, current_cat)
