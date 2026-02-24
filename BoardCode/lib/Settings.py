@@ -14,7 +14,7 @@ deployment_duration_ms = 2000
 min_lick_ms = 50
 max_lick_ms = 150
 min_licks_per_bout = 3
-max_bout_gap_ms = 1000
+max_bout_gap_ms = 12000
 
 cats={}
 cats['61000000007E30010000000000'] = {'name': 'henk', 'age': 6}

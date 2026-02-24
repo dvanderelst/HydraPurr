@@ -16,48 +16,26 @@ system_log = contents.system_log
 print(f"\nAnalyzing data folder: {contents.name}")
 print(f"Loaded {len(licks)} lick records")
 
-# OLD METHOD: Using utils.process_licks() with board settings
-print("\n--- OLD METHOD (utils.process_licks) ---")
-from lib import Settings
-old_processed, old_summary = utils.process_licks(
-    contents, 
-    group_gap_ms=Settings.max_bout_gap_ms, 
-    min_group_size=Settings.min_licks_per_bout
-)
-print(f"Old method: {len(old_processed)} events, {len(old_summary)} bouts")
-
-# NEW METHOD: Using BoutAnalyzer with same settings
-print("\n--- NEW METHOD (BoutAnalyzer) ---")
+# NEW METHOD: Using BoutAnalyzer with 12-second bout gap (12000ms)
+print("\n--- BOUT ANALYSIS (BoutAnalyzer) ---")
 analyzer = BoutAnalyzer()
-new_processed, new_summary = analyzer.analyze_dataframe(
+processed, summary = analyzer.analyze_dataframe(
     licks, 
-    group_gap_ms=Settings.max_bout_gap_ms, 
-    min_group_size=Settings.min_licks_per_bout
+    group_gap_ms=12000,  # 12-second gap between bouts
+    min_group_size=5     # Minimum 5 licks per bout
 )
-print(f"New method: {len(new_processed)} events, {len(new_summary)} bouts")
+print(f"Analysis: {len(processed)} events, {len(summary)} bouts")
 
-# Comparison
-print(f"\n--- COMPARISON ---")
-print(f"Events match: {len(old_processed) == len(new_processed)}")
-print(f"Bouts match: {len(old_summary) == len(new_summary)}")
-
-if len(old_processed) == len(new_processed) and len(old_summary) == len(new_summary):
-    print("✅ Both methods produce IDENTICAL results!")
-    print("   The new BoutAnalyzer uses the same algorithm as the board.")
-else:
-    print("⚠️  Methods produce different results (check parameters)")
-
-# Use new method for visualization (can switch to old if needed)
-processed = new_processed
-summary = new_summary
-
-# Add bout information to title
+# Add bout information summary
 if not summary.empty:
-    print(f"\n📊 Analysis Summary:")
+    print(f"\n📊 Bout Analysis Summary:")
     print(f"   Total bouts: {len(summary)}")
     print(f"   Average duration: {summary['duration'].mean():.1f}ms")
     print(f"   Average licks per bout: {summary['n'].mean():.1f}")
     print(f"   Average water change: {summary['water_delta'].mean():.3f}")
+    print(f"\nParameters used:")
+    print(f"   Bout gap: 12000ms (12 seconds)")
+    print(f"   Min licks per bout: 5")
 
 
 time = processed['time']
@@ -90,8 +68,60 @@ scatter_trace = go.Scatter(
     showlegend=True,
 )
 
+# Create bout extent rectangles (show duration of each bout)
+bout_rectangles = []
+if not summary.empty and 'group' in processed.columns:
+    for bout_id, bout_data in summary.iterrows():
+        # Get all events in this bout
+        bout_events = processed[processed['group'] == bout_id]
+        if len(bout_events) > 0:
+            bout_start = bout_events['time'].min()
+            bout_end = bout_events['time'].max()
+            
+            # Create rectangle showing bout extent
+            rectangle = go.Scatter(
+                x=[bout_start, bout_end, bout_end, bout_start, bout_start],
+                y=[1.5, 1.5, 2.5, 2.5, 1.5],  # Fixed y-range for visibility
+                mode="lines",
+                line={"color": "blue", "width": 2},
+                fill="toself",
+                fillcolor="rgba(0,0,255,0.1)",
+                name=f"Bout {int(bout_id)}",
+                showlegend=False,
+                hoverinfo="text",
+                text=f"Bout {int(bout_id)}: {len(bout_events)} licks, {bout_data['duration']:.0f}ms",
+            )
+            bout_rectangles.append(rectangle)
+
 fig = go.Figure(line_trace)
 fig.add_trace(scatter_trace)
+
+# Add bout rectangles
+for rect in bout_rectangles:
+    fig.add_trace(rect)
+
+# Add bout boundaries as vertical lines (simplified)
+if not summary.empty:
+    for bout_id, bout_data in summary.iterrows():
+        bout_events = processed[processed['group'] == bout_id]
+        if len(bout_events) > 0:
+            bout_start = bout_events['time'].min()
+            bout_end = bout_events['time'].max()
+            
+            # Add vertical lines at bout boundaries (without annotations to avoid timestamp issues)
+            fig.add_vline(
+                x=bout_start, 
+                line_dash="dash", 
+                line_color="blue",
+                line_width=1
+            )
+            fig.add_vline(
+                x=bout_end, 
+                line_dash="dash", 
+                line_color="blue",
+                line_width=1
+            )
+
 fig.show(renderer='browser')
 
 # Save the interactive plot as HTML
